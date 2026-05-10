@@ -1,24 +1,44 @@
+use interpreter::Lox;
 use std::env;
 use std::fs;
 use std::io;
 use std::io::Write;
 use std::process;
 
+mod ast;
+mod ast_formatter;
 mod interpreter;
 mod scanner;
-use interpreter::Lox;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut lox = Lox::new();
-    if args.len() > 2 {
-        println!("Usage: lox [script]");
-        process::exit(64);
-    } else if args.len() == 2 {
-        run_file(&mut lox, args[1].clone());
-    } else {
-        run_prompt(&mut lox);
-    }
+    //     let args: Vec<String> = env::args().collect();
+    //     let mut lox = Lox::new();
+    //     if args.len() > 2 {
+    //         println!("Usage: lox [script]");
+    //         process::exit(64);
+    //     } else if args.len() == 2 {
+    //         run_file(&mut lox, args[1].clone());
+    //     } else {
+    //         run_prompt(&mut lox);
+    //     }
+
+    let expr = ast::Expression::Binary {
+        left: Box::new(ast::Expression::Unary {
+            operator: ast::UnaryOperator::Minus,
+            expression: Box::new(ast::Expression::Literal {
+                value: ast::LiteralValue::Number(123.0),
+            }),
+        }),
+        operator: ast::BinaryOperator::Star,
+        right: Box::new(ast::Expression::Grouping {
+            expression: Box::new(ast::Expression::Literal {
+                value: ast::LiteralValue::Number(65.67),
+            }),
+        }),
+    };
+
+    let formatted = ast_formatter::AstFormatter {}.format_expression(&expr);
+    println!("{}", formatted)
 }
 
 fn run_file(lox: &mut Lox, filename: String) {

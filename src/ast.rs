@@ -1,4 +1,4 @@
-enum Expression {
+pub enum Expression {
     Literal {
         value: LiteralValue,
     },
@@ -11,24 +11,24 @@ enum Expression {
         operator: BinaryOperator,
         right: Box<Expression>,
     },
-    grouping {
+    Grouping {
         expression: Box<Expression>,
     },
 }
 
-enum LiteralValue {
+pub enum LiteralValue {
     Number(f64),
     String(String),
     Boolean(bool),
     Nil,
 }
 
-enum UnaryOperator {
+pub enum UnaryOperator {
     Bang,
     Minus,
 }
 
-enum BinaryOperator {
+pub enum BinaryOperator {
     EqualEqual,
     BangEqual,
     Greater,
