@@ -8,6 +8,7 @@ use std::process;
 mod ast;
 mod ast_formatter;
 mod interpreter;
+mod parser;
 mod scanner;
 
 fn main() {
