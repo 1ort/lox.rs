@@ -118,6 +118,19 @@ impl Parser {
     }
 
     fn primary(&mut self) -> ParserResult<Expression> {
+        let literal = match &self.peek().token_type {
+            TokenType::False => LiteralValue::Boolean(false),
+            TokenType::True => LiteralValue::Boolean(true),
+            TokenType::Nil => LiteralValue::Nil,
+            TokenType::Number(num) => LiteralValue::Number(*num),
+            TokenType::String(string) => LiteralValue::String(string.clone()),
+            _ => return self.grouping(),
+        };
+        self.advance();
+        return Ok(Expression::Literal { value: literal });
+    }
+
+    fn grouping(&mut self) -> ParserResult<Expression> {
         if matches!(self.peek().token_type, TokenType::LeftParen) {
             self.advance();
             let expr = self.expression()?;
@@ -129,18 +142,9 @@ impl Parser {
             } else {
                 return Err(format!("Expected: ')', got: {}", self.peek().lexeme));
             }
+        } else {
+            return Err(format!("Unexpected token: {}", self.peek().lexeme));
         }
-
-        let literal = match &self.peek().token_type {
-            TokenType::False => LiteralValue::Boolean(false),
-            TokenType::True => LiteralValue::Boolean(true),
-            TokenType::Nil => LiteralValue::Nil,
-            TokenType::Number(num) => LiteralValue::Number(*num),
-            TokenType::String(string) => LiteralValue::String(string.clone()),
-            _ => return Err(format!("Unexpected token: {}", self.peek().lexeme)),
-        };
-        self.advance();
-        return Ok(Expression::Literal { value: literal });
     }
 
     fn is_at_end(&self) -> bool {
