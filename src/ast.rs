@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Expression {
     Literal {
         value: LiteralValue,
@@ -16,6 +17,7 @@ pub enum Expression {
     },
 }
 
+#[derive(Debug)]
 pub enum LiteralValue {
     Number(f64),
     String(String),
@@ -23,11 +25,13 @@ pub enum LiteralValue {
     Nil,
 }
 
+#[derive(Debug)]
 pub enum UnaryOperator {
     Bang,
     Minus,
 }
 
+#[derive(Debug)]
 pub enum BinaryOperator {
     EqualEqual,
     BangEqual,

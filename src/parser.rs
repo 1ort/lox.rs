@@ -3,7 +3,7 @@ use crate::{
     scanner::{Token, TokenType},
 };
 
-pub struct Parser {
+struct Parser {
     tokens: Vec<Token>,
     current: usize,
 }
@@ -11,8 +11,13 @@ pub struct Parser {
 type ParserError = String;
 type ParserResult<T> = Result<T, ParserError>;
 
+pub fn parse_tokens(tokens: Vec<Token>) -> ParserResult<Expression> {
+    let mut parser = Parser::new(tokens);
+    parser.expression()
+}
+
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    fn new(tokens: Vec<Token>) -> Self {
         Parser { tokens, current: 0 }
     }
 
@@ -134,6 +139,7 @@ impl Parser {
             TokenType::String(string) => LiteralValue::String(string.clone()),
             _ => return Err(format!("Unexpected token: {}", self.peek().lexeme)),
         };
+        self.advance();
         return Ok(Expression::Literal { value: literal });
     }
 
