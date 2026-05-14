@@ -1,4 +1,4 @@
-use crate::{parser::parse_tokens, scanner};
+use crate::{interpreter::Interpreter, parser::parse_tokens, scanner};
 
 pub struct Lox {
     had_error: bool,
@@ -18,6 +18,8 @@ impl Lox {
                 match parse_tokens(tokens) {
                     Ok(expr) => {
                         println!("{:#?}", expr);
+                        let mut interpreter = Interpreter {};
+                        println!("{:#?}", interpreter.eval(&expr));
                     }
                     Err(err) => self.error(0, &err),
                 }

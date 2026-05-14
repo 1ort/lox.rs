@@ -6,6 +6,7 @@ use std::io::Write;
 use std::process;
 
 mod ast;
+mod interpreter;
 mod parser;
 mod runner;
 mod scanner;
