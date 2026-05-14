@@ -1,4 +1,15 @@
 #[derive(Debug)]
+pub struct Program {
+    pub statements: Vec<Statement>,
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    Expression { expression: Box<Expression> },
+    Print { expression: Box<Expression> },
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal {
         value: LiteralValue,

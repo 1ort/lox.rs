@@ -1,4 +1,4 @@
-use crate::{interpreter::Interpreter, parser::parse_tokens, scanner};
+use crate::{interpreter::Interpreter, parser::parse_program, scanner};
 
 pub struct Lox {
     had_error: bool,
@@ -11,15 +11,17 @@ impl Lox {
 
     pub fn run(&mut self, source: &str) {
         self.had_error = false; // reset error flag
+        let mut interpreter = Interpreter {};
         let tokens = scanner::scan_tokens(source.to_string());
         match tokens {
             Ok(tokens) => {
                 //println!("{:#?}", tokens);
-                match parse_tokens(tokens) {
-                    Ok(expr) => {
-                        println!("{:#?}", expr);
-                        let mut interpreter = Interpreter {};
-                        println!("{:#?}", interpreter.eval(&expr));
+                match parse_program(tokens) {
+                    Ok(program) => {
+                        // println!("{:#?}", program);
+                        if let Err(err) = interpreter.exec(&program) {
+                            self.error(0, &err);
+                        }
                     }
                     Err(err) => self.error(0, &err),
                 }

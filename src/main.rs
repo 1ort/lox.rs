@@ -7,6 +7,7 @@ use std::process;
 
 mod ast;
 mod interpreter;
+mod object;
 mod parser;
 mod runner;
 mod scanner;

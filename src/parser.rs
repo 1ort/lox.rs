@@ -1,5 +1,5 @@
 use crate::{
-    ast::{BinaryOperator, Expression, LiteralValue, UnaryOperator},
+    ast::{BinaryOperator, Expression, LiteralValue, Program, Statement, UnaryOperator},
     scanner::{Token, TokenType},
 };
 
@@ -11,21 +11,60 @@ struct Parser {
 type ParserError = String;
 type ParserResult<T> = Result<T, ParserError>;
 
-pub fn parse_tokens(tokens: Vec<Token>) -> ParserResult<Expression> {
+pub fn parse_program(tokens: Vec<Token>) -> ParserResult<Program> {
     let mut parser = Parser::new(tokens);
-    let expr = parser.expression()?;
-    match parser.peek().token_type {
-        TokenType::Eof => Ok(expr),
-        _ => Err(format!(
-            "Unexpected token: {}, EOF expected",
-            parser.peek().lexeme
-        )),
-    }
+    parser.program()
 }
 
 impl Parser {
     fn new(tokens: Vec<Token>) -> Self {
         Parser { tokens, current: 0 }
+    }
+
+    fn program(&mut self) -> ParserResult<Program> {
+        let mut program = Program {
+            statements: Vec::new(),
+        };
+
+        while !self.is_at_end() {
+            program.statements.push(self.statement()?);
+        }
+        Ok(program)
+    }
+
+    fn statement(&mut self) -> ParserResult<Statement> {
+        match self.peek().token_type {
+            TokenType::Print => {
+                self.advance();
+                self.print_statement()
+            }
+            _ => self.expression_statement(),
+        }
+    }
+
+    fn print_statement(&mut self) -> ParserResult<Statement> {
+        let expr = self.expression()?;
+        self.expect_semicolon()?;
+        Ok(Statement::Print {
+            expression: Box::new(expr),
+        })
+    }
+
+    fn expression_statement(&mut self) -> ParserResult<Statement> {
+        let expr = self.expression()?;
+        self.expect_semicolon()?;
+        Ok(Statement::Expression {
+            expression: Box::new(expr),
+        })
+    }
+    fn expect_semicolon(&mut self) -> ParserResult<()> {
+        match self.peek().token_type {
+            TokenType::Semicolon => {
+                self.advance();
+                Ok(())
+            }
+            _ => Err(format!("Expected ';' after statement")),
+        }
     }
 
     fn expression(&mut self) -> ParserResult<Expression> {
@@ -170,5 +209,12 @@ impl Parser {
         let token = &self.tokens[self.current];
         self.current += 1;
         token
+    }
+
+    fn is_at_end(&mut self) -> bool {
+        match self.peek().token_type {
+            TokenType::Eof => true,
+            _ => false,
+        }
     }
 }
