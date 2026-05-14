@@ -1,5 +1,4 @@
 use crate::ast::{BinaryOperator, Expression, LiteralValue, UnaryOperator};
-type RuntimeError = String;
 type EvalResult<T> = Result<T, String>;
 
 pub struct Interpreter {}
@@ -129,7 +128,7 @@ impl LoxObject {
 
     fn mul(&self, other: &LoxObject) -> EvalResult<LoxObject> {
         match (self, other) {
-            (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a / b)),
+            (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a * b)),
             _ => Err(format!("Can not multiply {:?} * {:?}", self, other)),
         }
     }

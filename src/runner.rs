@@ -14,7 +14,7 @@ impl Lox {
         let tokens = scanner::scan_tokens(source.to_string());
         match tokens {
             Ok(tokens) => {
-                // println!("{:#?}", tokens);
+                //println!("{:#?}", tokens);
                 match parse_tokens(tokens) {
                     Ok(expr) => {
                         println!("{:#?}", expr);

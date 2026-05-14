@@ -13,7 +13,14 @@ type ParserResult<T> = Result<T, ParserError>;
 
 pub fn parse_tokens(tokens: Vec<Token>) -> ParserResult<Expression> {
     let mut parser = Parser::new(tokens);
-    parser.expression()
+    let expr = parser.expression()?;
+    match parser.peek().token_type {
+        TokenType::Eof => Ok(expr),
+        _ => Err(format!(
+            "Unexpected token: {}, EOF expected",
+            parser.peek().lexeme
+        )),
+    }
 }
 
 impl Parser {
@@ -23,13 +30,7 @@ impl Parser {
 
     fn expression(&mut self) -> ParserResult<Expression> {
         let expr = self.equality()?;
-        match self.peek().token_type {
-            TokenType::Eof => Ok(expr),
-            _ => Err(format!(
-                "Unexpected token: {}, EOF expected",
-                self.peek().lexeme
-            )),
-        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> ParserResult<Expression> {

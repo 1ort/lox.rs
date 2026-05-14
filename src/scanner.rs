@@ -240,7 +240,7 @@ impl<'a> Lexer<'a> {
             }
             '/' => {
                 if self.match_next('/') {
-                    self.skip_till(|c| c.eq(&'\n'));
+                    self.skip_till(|c| !c.eq(&'\n'));
                     return self.lex();
                 } else {
                     TokenType::Slash
