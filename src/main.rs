@@ -1,4 +1,4 @@
-use interpreter::Lox;
+use runner::Lox;
 use std::env;
 use std::fs;
 use std::io;
@@ -6,9 +6,8 @@ use std::io::Write;
 use std::process;
 
 mod ast;
-mod ast_formatter;
-mod interpreter;
 mod parser;
+mod runner;
 mod scanner;
 
 fn main() {
@@ -22,24 +21,6 @@ fn main() {
     } else {
         run_prompt(&mut lox);
     }
-
-    // let expr = ast::Expression::Binary {
-    //     left: Box::new(ast::Expression::Unary {
-    //         operator: ast::UnaryOperator::Minus,
-    //         expression: Box::new(ast::Expression::Literal {
-    //             value: ast::LiteralValue::Number(123.0),
-    //         }),
-    //     }),
-    //     operator: ast::BinaryOperator::Star,
-    //     right: Box::new(ast::Expression::Grouping {
-    //         expression: Box::new(ast::Expression::Literal {
-    //             value: ast::LiteralValue::Number(65.67),
-    //         }),
-    //     }),
-    // };
-
-    // let formatted = ast_formatter::AstFormatter {}.format_expression(&expr);
-    // println!("{}", formatted)
 }
 
 fn run_file(lox: &mut Lox, filename: String) {
