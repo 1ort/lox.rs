@@ -22,7 +22,14 @@ impl Parser {
     }
 
     fn expression(&mut self) -> ParserResult<Expression> {
-        return self.equality();
+        let expr = self.equality()?;
+        match self.peek().token_type {
+            TokenType::Eof => Ok(expr),
+            _ => Err(format!(
+                "Unexpected token: {}, EOF expected",
+                self.peek().lexeme
+            )),
+        }
     }
 
     fn equality(&mut self) -> ParserResult<Expression> {
@@ -41,7 +48,7 @@ impl Parser {
                 right: Box::new(right),
             }
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn comparison(&mut self) -> ParserResult<Expression> {
@@ -62,7 +69,7 @@ impl Parser {
                 right: Box::new(right),
             }
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn term(&mut self) -> ParserResult<Expression> {
@@ -81,7 +88,7 @@ impl Parser {
                 right: Box::new(right),
             }
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn factor(&mut self) -> ParserResult<Expression> {
@@ -100,21 +107,21 @@ impl Parser {
                 right: Box::new(right),
             }
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn unary(&mut self) -> ParserResult<Expression> {
         let unary_operator = match self.peek().token_type {
             TokenType::Bang => UnaryOperator::Bang,
             TokenType::Minus => UnaryOperator::Minus,
-            _ => return Ok(self.primary()?),
+            _ => return self.primary(),
         };
         self.advance();
         let expr = self.unary()?;
-        return Ok(Expression::Unary {
+        Ok(Expression::Unary {
             operator: unary_operator,
             expression: Box::new(expr),
-        });
+        })
     }
 
     fn primary(&mut self) -> ParserResult<Expression> {
@@ -127,7 +134,7 @@ impl Parser {
             _ => return self.grouping(),
         };
         self.advance();
-        return Ok(Expression::Literal { value: literal });
+        Ok(Expression::Literal { value: literal })
     }
 
     fn grouping(&mut self) -> ParserResult<Expression> {
@@ -136,26 +143,26 @@ impl Parser {
             let expr = self.expression()?;
             if matches!(self.peek().token_type, TokenType::RightParen) {
                 self.advance();
-                return Ok(Expression::Grouping {
+                Ok(Expression::Grouping {
                     expression: Box::new(expr),
-                });
+                })
             } else {
-                return Err(format!("Expected: ')', got: {}", self.peek().lexeme));
+                Err(format!("Expected: ')', got: {}", self.peek().lexeme))
             }
         } else {
-            return Err(format!("Unexpected token: {}", self.peek().lexeme));
+            self.fallback()
         }
     }
 
-    fn is_at_end(&self) -> bool {
+    fn fallback(&mut self) -> ParserResult<Expression> {
         match self.peek().token_type {
-            TokenType::Eof => true,
-            _ => false,
+            TokenType::Eof => Err("Unexpected EOF".to_string()),
+            _ => Err(format!("Unexpected token: {}", self.peek().lexeme)),
         }
     }
 
     fn peek(&self) -> &Token {
-        return &self.tokens[self.current];
+        &self.tokens[self.current]
     }
 
     fn advance(&mut self) -> &Token {
