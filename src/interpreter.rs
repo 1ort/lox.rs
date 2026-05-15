@@ -61,12 +61,19 @@ impl Interpreter {
                 right,
             } => self.eval_binary(left, operator, right),
             Expression::Variable { name } => self.eval_variable(name),
+            Expression::Assignment { name, expression } => self.eval_assignment(name, expression),
         }
     }
 
     fn eval_variable(&mut self, name: &String) -> EvalResult<LoxObject> {
-        let obj_ref = self.environment.get(name.clone())?;
+        let obj_ref = self.environment.get(name)?;
         Ok(obj_ref.clone())
+    }
+
+    fn eval_assignment(&mut self, name: &String, expression: &Expression) -> EvalResult<LoxObject> {
+        let value = self.eval_expression(expression)?;
+        self.environment.assign(name, value.clone())?;
+        Ok(value)
     }
 
     fn eval_literal_value(&mut self, val: &LiteralValue) -> EvalResult<LoxObject> {

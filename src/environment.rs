@@ -18,12 +18,19 @@ impl Environment {
         self.values.insert(name, value);
     }
 
-    pub fn get(&mut self, name: String) -> Result<&LoxObject, String> {
+    pub fn get(&mut self, name: &String) -> Result<&LoxObject, String> {
         // println!("{:?}", self.values);
         self.values
-            .get(&name)
+            .get(name)
             .ok_or(format!("Undefined variable: {} .", name))
     }
 
-    // pub fn set(&mut self, name: String, )
+    pub fn assign(&mut self, name: &String, value: LoxObject) -> Result<(), String> {
+        if self.values.contains_key(name) {
+            self.values.insert(name.clone(), value);
+            Ok(())
+        } else {
+            Err(format!("Undefined variable: {} .", name))
+        }
+    }
 }

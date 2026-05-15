@@ -25,6 +25,10 @@ pub enum Expression {
     Variable {
         name: String,
     },
+    Assignment {
+        name: String,
+        expression: Box<Expression>,
+    },
     Unary {
         operator: UnaryOperator,
         expression: Box<Expression>,
