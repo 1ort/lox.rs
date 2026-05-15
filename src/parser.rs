@@ -27,6 +27,7 @@ impl Parser {
         };
 
         while !self.is_at_end() {
+            // TODO: synchronize
             program.statements.push(self.declaration()?);
         }
         Ok(program)
@@ -45,7 +46,7 @@ impl Parser {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
-            return Err(format!("Expected variable name."));
+            return Err("Expected variable name.".to_string());
         };
 
         self.advance();
@@ -91,12 +92,12 @@ impl Parser {
                 self.advance();
                 Ok(())
             }
-            _ => Err(format!("Expected ';' after statement")),
+            _ => Err("Expected ';' after statement".to_string()),
         }
     }
 
     fn expression(&mut self) -> ParserResult<Expression> {
-        return self.assignment();
+        self.assignment()
     }
 
     fn assignment(&mut self) -> ParserResult<Expression> {
@@ -270,9 +271,6 @@ impl Parser {
     }
 
     fn is_at_end(&mut self) -> bool {
-        match self.peek().token_type {
-            TokenType::Eof => true,
-            _ => false,
-        }
+        matches!(self.peek().token_type, TokenType::Eof)
     }
 }
