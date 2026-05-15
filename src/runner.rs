@@ -2,24 +2,27 @@ use crate::{interpreter::Interpreter, parser::parse_program, scanner};
 
 pub struct Lox {
     had_error: bool,
+    interpreter: Interpreter,
 }
 
 impl Lox {
     pub fn new() -> Lox {
-        Lox { had_error: false }
+        Lox {
+            had_error: false,
+            interpreter: Interpreter::new(),
+        }
     }
 
     pub fn run(&mut self, source: &str) {
         self.had_error = false; // reset error flag
-        let mut interpreter = Interpreter {};
         let tokens = scanner::scan_tokens(source.to_string());
         match tokens {
             Ok(tokens) => {
                 //println!("{:#?}", tokens);
                 match parse_program(tokens) {
                     Ok(program) => {
-                        // println!("{:#?}", program);
-                        if let Err(err) = interpreter.exec(&program) {
+                        //println!("{:#?}", program);
+                        if let Err(err) = self.interpreter.exec(&program) {
                             self.error(0, &err);
                         }
                     }

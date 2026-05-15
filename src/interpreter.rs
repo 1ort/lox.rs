@@ -1,9 +1,18 @@
 use crate::ast::{BinaryOperator, Expression, LiteralValue, Program, Statement, UnaryOperator};
+use crate::environment::Environment;
 use crate::object::{EvalResult, LoxObject};
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
+    pub fn new() -> Interpreter {
+        Interpreter {
+            environment: Environment::new(),
+        }
+    }
+
     pub fn exec(&mut self, program: &Program) -> EvalResult<()> {
         let mut iterator = program.statements.iter();
 
@@ -26,6 +35,15 @@ impl Interpreter {
                 println!("{}", obj.format());
                 Ok(())
             }
+            Statement::VarDeclaration { name, initializer } => {
+                let value = if let Some(expression) = initializer {
+                    self.eval_expression(expression)?
+                } else {
+                    LoxObject::Nil
+                };
+                self.environment.define(name.clone(), value);
+                Ok(())
+            }
         }
     }
 
@@ -42,7 +60,13 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_binary(left, operator, right),
+            Expression::Variable { name } => self.eval_variable(name),
         }
+    }
+
+    fn eval_variable(&mut self, name: &String) -> EvalResult<LoxObject> {
+        let obj_ref = self.environment.get(name.clone())?;
+        Ok(obj_ref.clone())
     }
 
     fn eval_literal_value(&mut self, val: &LiteralValue) -> EvalResult<LoxObject> {

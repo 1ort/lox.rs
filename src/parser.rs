@@ -27,9 +27,37 @@ impl Parser {
         };
 
         while !self.is_at_end() {
-            program.statements.push(self.statement()?);
+            program.statements.push(self.declaration()?);
         }
         Ok(program)
+    }
+    fn declaration(&mut self) -> ParserResult<Statement> {
+        match self.peek().token_type {
+            TokenType::Var => {
+                self.advance();
+                self.var_declaration()
+            }
+            _ => self.statement(),
+        }
+    }
+
+    fn var_declaration(&mut self) -> ParserResult<Statement> {
+        let name = if let TokenType::Identifier(name) = &self.peek().token_type {
+            name.clone()
+        } else {
+            return Err(format!("Expected variable name."));
+        };
+
+        self.advance();
+
+        let initializer = if let TokenType::Equal = &self.peek().token_type {
+            self.advance();
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+        self.expect_semicolon()?;
+        Ok(Statement::VarDeclaration { name, initializer })
     }
 
     fn statement(&mut self) -> ParserResult<Statement> {
@@ -165,16 +193,27 @@ impl Parser {
     }
 
     fn primary(&mut self) -> ParserResult<Expression> {
-        let literal = match &self.peek().token_type {
-            TokenType::False => LiteralValue::Boolean(false),
-            TokenType::True => LiteralValue::Boolean(true),
-            TokenType::Nil => LiteralValue::Nil,
-            TokenType::Number(num) => LiteralValue::Number(*num),
-            TokenType::String(string) => LiteralValue::String(string.clone()),
+        use Expression::{Literal, Variable};
+        use LiteralValue::*;
+        let expression = match &self.peek().token_type {
+            TokenType::False => Literal {
+                value: Boolean(false),
+            },
+            TokenType::True => Literal {
+                value: Boolean(true),
+            },
+            TokenType::Nil => Literal { value: Nil },
+            TokenType::Number(num) => Literal {
+                value: Number(*num),
+            },
+            TokenType::String(string) => Literal {
+                value: String(string.clone()),
+            },
+            TokenType::Identifier(name) => Variable { name: name.clone() },
             _ => return self.grouping(),
         };
         self.advance();
-        Ok(Expression::Literal { value: literal })
+        Ok(expression)
     }
 
     fn grouping(&mut self) -> ParserResult<Expression> {

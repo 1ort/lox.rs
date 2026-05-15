@@ -1,5 +1,5 @@
 pub type EvalResult<T> = Result<T, String>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoxObject {
     Number(f64),
     String(String),

@@ -5,14 +5,25 @@ pub struct Program {
 
 #[derive(Debug)]
 pub enum Statement {
-    Expression { expression: Box<Expression> },
-    Print { expression: Box<Expression> },
+    Expression {
+        expression: Box<Expression>,
+    },
+    Print {
+        expression: Box<Expression>,
+    },
+    VarDeclaration {
+        name: String,
+        initializer: Option<Box<Expression>>,
+    },
 }
 
 #[derive(Debug)]
 pub enum Expression {
     Literal {
         value: LiteralValue,
+    },
+    Variable {
+        name: String,
     },
     Unary {
         operator: UnaryOperator,
