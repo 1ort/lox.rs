@@ -4,16 +4,20 @@ use crate::object::LoxObject;
 
 #[derive(Debug)]
 pub struct Environment {
-    enclosing: Option<Box<Environment>>,
+    pub enclosing: Option<Box<Environment>>,
     values: HashMap<String, LoxObject>,
 }
 
 impl Environment {
-    pub fn new(enclosing: Option<Box<Environment>>) -> Self {
+    pub fn new() -> Self {
         Environment {
-            enclosing,
+            enclosing: None,
             values: HashMap::new(),
         }
+    }
+
+    pub fn set_enclosing(&mut self, enclosing: Option<Box<Environment>>) {
+        self.enclosing = enclosing;
     }
 
     pub fn define(&mut self, name: String, value: LoxObject) {

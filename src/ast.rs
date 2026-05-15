@@ -11,6 +11,9 @@ pub enum Statement {
     Print {
         expression: Box<Expression>,
     },
+    Block {
+        statements: Vec<Statement>,
+    },
     VarDeclaration {
         name: String,
         initializer: Option<Box<Expression>>,

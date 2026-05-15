@@ -63,12 +63,28 @@ impl Parser {
 
     fn statement(&mut self) -> ParserResult<Statement> {
         match self.peek().token_type {
+            TokenType::LeftBrace => {
+                self.advance();
+                self.block_statement()
+            }
             TokenType::Print => {
                 self.advance();
                 self.print_statement()
             }
             _ => self.expression_statement(),
         }
+    }
+
+    fn block_statement(&mut self) -> ParserResult<Statement> {
+        let mut statements = Vec::new();
+        loop {
+            if matches!(self.peek().token_type, TokenType::RightBrace) || self.is_at_end() {
+                break;
+            }
+            statements.push(self.declaration()?);
+        }
+        self.expect_closing_brace()?;
+        Ok(Statement::Block { statements })
     }
 
     fn print_statement(&mut self) -> ParserResult<Statement> {
@@ -93,6 +109,16 @@ impl Parser {
                 Ok(())
             }
             _ => Err("Expected ';' after statement".to_string()),
+        }
+    }
+
+    fn expect_closing_brace(&mut self) -> ParserResult<()> {
+        match self.peek().token_type {
+            TokenType::RightBrace => {
+                self.advance();
+                Ok(())
+            }
+            _ => Err("Expected '}' after block".to_string()),
         }
     }
 

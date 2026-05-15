@@ -1,15 +1,17 @@
+use std::env;
+
 use crate::ast::{BinaryOperator, Expression, LiteralValue, Program, Statement, UnaryOperator};
 use crate::environment::Environment;
 use crate::object::{EvalResult, LoxObject};
 
 pub struct Interpreter {
-    environment: Environment,
+    environment: Box<Environment>,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter {
-            environment: Environment::new(None),
+            environment: Box::new(Environment::new()),
         }
     }
 
@@ -26,6 +28,10 @@ impl Interpreter {
 
     pub fn exec_statement(&mut self, statement: &Statement) -> EvalResult<()> {
         match statement {
+            Statement::Block { statements } => {
+                self.exec_block(statements, Box::new(Environment::new()))?;
+                Ok(())
+            }
             Statement::Expression { expression } => {
                 self.eval_expression(expression)?;
                 Ok(())
@@ -45,6 +51,27 @@ impl Interpreter {
                 Ok(())
             }
         }
+    }
+    fn exec_block(
+        &mut self,
+        statements: &Vec<Statement>,
+        environment: Box<Environment>,
+    ) -> EvalResult<()> {
+        use std::mem::replace;
+
+        let current_env = replace(&mut self.environment, environment);
+        self.environment.set_enclosing(Some(current_env));
+
+        for statement in statements {
+            self.exec_statement(statement)?;
+        }
+
+        let current_env = self.environment.enclosing.take();
+        match current_env {
+            Some(boxed_env) => self.environment = boxed_env,
+            None => return Err("Unexpected error: can not unwrap environment stack".to_string()),
+        }
+        Ok(())
     }
 
     fn eval_expression(&mut self, expr: &Expression) -> EvalResult<LoxObject> {
