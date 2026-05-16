@@ -8,6 +8,13 @@ pub enum LoxObject {
 }
 
 impl LoxObject {
+    pub fn bool_native(&self) -> bool {
+        match self.bool().unwrap() {
+            Self::Boolean(a) => a,
+            _ => false,
+        }
+    }
+
     pub fn bool(&self) -> EvalResult<LoxObject> {
         match self {
             LoxObject::Boolean(b) => Ok(LoxObject::Boolean(*b)),
@@ -28,7 +35,7 @@ impl LoxObject {
     pub fn not(&self) -> EvalResult<LoxObject> {
         match self.bool() {
             Ok(LoxObject::Boolean(val)) => Ok(LoxObject::Boolean(!val)),
-            _ => Err(format!("Can not apply unary '!'.",)),
+            _ => Err("Can not apply unary '!'.".to_string()),
         }
     }
 
@@ -132,7 +139,7 @@ impl LoxObject {
     pub fn format(&self) -> String {
         match self {
             LoxObject::Number(val) => format!("{}", val),
-            LoxObject::String(val) => format!("{}", val),
+            LoxObject::String(val) => val.to_string(),
             LoxObject::Boolean(val) => format!("{}", val),
             LoxObject::Nil => "Nil".to_string(),
         }

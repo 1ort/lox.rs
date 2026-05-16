@@ -18,6 +18,11 @@ pub enum Statement {
         name: String,
         initializer: Option<Box<Expression>>,
     },
+    Conditional {
+        condition: Box<Expression>,
+        then_branch: Box<Statement>,
+        else_branch: Option<Box<Statement>>,
+    },
 }
 
 #[derive(Debug)]

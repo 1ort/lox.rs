@@ -1,0 +1,11 @@
+var x = 15;
+
+if (x>10) {
+    var x = x+5;
+    print x;
+} else {
+    print "bad";
+}
+print x;
+
+

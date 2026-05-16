@@ -1,5 +1,3 @@
-use std::env;
-
 use crate::ast::{BinaryOperator, Expression, LiteralValue, Program, Statement, UnaryOperator};
 use crate::environment::Environment;
 use crate::object::{EvalResult, LoxObject};
@@ -48,6 +46,18 @@ impl Interpreter {
                     LoxObject::Nil
                 };
                 self.environment.define(name.clone(), value);
+                Ok(())
+            }
+            Statement::Conditional {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if self.eval_expression(condition)?.bool_native() {
+                    self.exec_statement(then_branch)?;
+                } else if let Some(else_branch_unwrapped) = else_branch {
+                    self.exec_statement(else_branch_unwrapped)?;
+                }
                 Ok(())
             }
         }

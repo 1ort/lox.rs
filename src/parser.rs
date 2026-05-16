@@ -57,7 +57,8 @@ impl Parser {
         } else {
             None
         };
-        self.expect_semicolon()?;
+
+        self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
         Ok(Statement::VarDeclaration { name, initializer })
     }
 
@@ -71,6 +72,10 @@ impl Parser {
                 self.advance();
                 self.print_statement()
             }
+            TokenType::If => {
+                self.advance();
+                self.if_statement()
+            }
             _ => self.expression_statement(),
         }
     }
@@ -83,42 +88,54 @@ impl Parser {
             }
             statements.push(self.declaration()?);
         }
-        self.expect_closing_brace()?;
+
+        self.expect_token(TokenType::RightBrace, "Expected '}' after block.")?;
         Ok(Statement::Block { statements })
     }
 
     fn print_statement(&mut self) -> ParserResult<Statement> {
         let expr = self.expression()?;
-        self.expect_semicolon()?;
+        self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
         Ok(Statement::Print {
             expression: Box::new(expr),
         })
     }
 
+    fn if_statement(&mut self) -> ParserResult<Statement> {
+        self.expect_token(TokenType::LeftParen, "Expected '(' after 'if'.")?;
+        let condition = Box::new(self.expression()?);
+        self.expect_token(TokenType::RightParen, "Expected ')' after if condition.")?;
+        let then_branch = Box::new(self.statement()?);
+
+        let else_branch = if matches!(self.peek().token_type, TokenType::Else) {
+            self.advance();
+            Some(Box::new(self.statement()?))
+        } else {
+            None
+        };
+
+        Ok(Statement::Conditional {
+            condition,
+            then_branch,
+            else_branch,
+        })
+    }
+
     fn expression_statement(&mut self) -> ParserResult<Statement> {
         let expr = self.expression()?;
-        self.expect_semicolon()?;
+
+        self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
         Ok(Statement::Expression {
             expression: Box::new(expr),
         })
     }
-    fn expect_semicolon(&mut self) -> ParserResult<()> {
-        match self.peek().token_type {
-            TokenType::Semicolon => {
-                self.advance();
-                Ok(())
-            }
-            _ => Err("Expected ';' after statement".to_string()),
-        }
-    }
 
-    fn expect_closing_brace(&mut self) -> ParserResult<()> {
-        match self.peek().token_type {
-            TokenType::RightBrace => {
-                self.advance();
-                Ok(())
-            }
-            _ => Err("Expected '}' after block".to_string()),
+    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> ParserResult<()> {
+        if self.peek().token_type == expected {
+            self.advance();
+            Ok(())
+        } else {
+            Err(error_msg.to_string())
         }
     }
 

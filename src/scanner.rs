@@ -21,7 +21,7 @@ impl fmt::Display for LexerError {
 
 type LexerResult<T> = std::result::Result<T, LexerError>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TokenType {
     Eof,
 
