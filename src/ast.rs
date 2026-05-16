@@ -46,6 +46,11 @@ pub enum Expression {
         operator: BinaryOperator,
         right: Box<Expression>,
     },
+    Logical {
+        left: Box<Expression>,
+        operator: LogicalOperator,
+        right: Box<Expression>,
+    },
     Grouping {
         expression: Box<Expression>,
     },
@@ -77,4 +82,10 @@ pub enum BinaryOperator {
     Plus,
     Slash,
     Star,
+}
+
+#[derive(Debug)]
+pub enum LogicalOperator {
+    Or,
+    And,
 }

@@ -1,5 +1,8 @@
 use crate::{
-    ast::{BinaryOperator, Expression, LiteralValue, Program, Statement, UnaryOperator},
+    ast::{
+        BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement,
+        UnaryOperator,
+    },
     scanner::{Token, TokenType},
 };
 
@@ -144,7 +147,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> ParserResult<Expression> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if let TokenType::Equal = self.peek().token_type {
             self.advance();
@@ -160,6 +163,44 @@ impl Parser {
             }
         }
 
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> ParserResult<Expression> {
+        let mut expr = self.and()?;
+
+        loop {
+            if matches!(self.peek().token_type, TokenType::Or) {
+                self.advance();
+                let right = self.and()?;
+                expr = Expression::Logical {
+                    left: Box::new(expr),
+                    operator: LogicalOperator::Or,
+                    right: Box::new(right),
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> ParserResult<Expression> {
+        let mut expr = self.equality()?;
+
+        loop {
+            if matches!(self.peek().token_type, TokenType::And) {
+                self.advance();
+                let right = self.equality()?;
+                expr = Expression::Logical {
+                    left: Box::new(expr),
+                    operator: LogicalOperator::And,
+                    right: Box::new(right),
+                }
+            } else {
+                break;
+            }
+        }
         Ok(expr)
     }
 

@@ -1,4 +1,6 @@
-use crate::ast::{BinaryOperator, Expression, LiteralValue, Program, Statement, UnaryOperator};
+use crate::ast::{
+    BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement, UnaryOperator,
+};
 use crate::environment::Environment;
 use crate::object::{EvalResult, LoxObject};
 
@@ -99,6 +101,11 @@ impl Interpreter {
             } => self.eval_binary(left, operator, right),
             Expression::Variable { name } => self.eval_variable(name),
             Expression::Assignment { name, expression } => self.eval_assignment(name, expression),
+            Expression::Logical {
+                left,
+                operator,
+                right,
+            } => self.eval_logical(left, operator, right),
         }
     }
 
@@ -154,5 +161,27 @@ impl Interpreter {
             BinaryOperator::Slash => left.div(&right),
             BinaryOperator::Star => left.mul(&right),
         }
+    }
+
+    fn eval_logical(
+        &mut self,
+        left: &Expression,
+        operator: &LogicalOperator,
+        right: &Expression,
+    ) -> EvalResult<LoxObject> {
+        let left_result = self.eval_expression(left)?;
+        match operator {
+            LogicalOperator::Or => {
+                if left_result.bool_native() {
+                    return Ok(left_result);
+                }
+            }
+            LogicalOperator::And => {
+                if !left_result.bool_native() {
+                    return Ok(left_result);
+                }
+            }
+        }
+        self.eval_expression(right)
     }
 }
