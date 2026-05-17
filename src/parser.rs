@@ -79,6 +79,10 @@ impl Parser {
                 self.advance();
                 self.if_statement()
             }
+            TokenType::While => {
+                self.advance();
+                self.while_statement()
+            }
             _ => self.expression_statement(),
         }
     }
@@ -122,6 +126,15 @@ impl Parser {
             then_branch,
             else_branch,
         })
+    }
+
+    fn while_statement(&mut self) -> ParserResult<Statement> {
+        self.expect_token(TokenType::LeftParen, "Expected '(' after 'while'.")?;
+        let condition = Box::new(self.expression()?);
+        self.expect_token(TokenType::RightParen, "Expected ')' after loop condition.")?;
+        let body = Box::new(self.statement()?);
+
+        Ok(Statement::WhileLoop { condition, body })
     }
 
     fn expression_statement(&mut self) -> ParserResult<Statement> {

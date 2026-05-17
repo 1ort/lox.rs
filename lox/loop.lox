@@ -1,0 +1,6 @@
+print "Hello world!";
+
+var x = 0;
+while ((x=x+1) < 10) {
+    print x;
+  }

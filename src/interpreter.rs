@@ -62,6 +62,12 @@ impl Interpreter {
                 }
                 Ok(())
             }
+            Statement::WhileLoop { condition, body } => {
+                while self.eval_expression(condition)?.bool_native() {
+                    self.exec_statement(body)?;
+                }
+                Ok(())
+            }
         }
     }
     fn exec_block(

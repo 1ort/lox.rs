@@ -23,6 +23,10 @@ pub enum Statement {
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
+    WhileLoop {
+        condition: Box<Expression>,
+        body: Box<Statement>,
+    },
 }
 
 #[derive(Debug)]
