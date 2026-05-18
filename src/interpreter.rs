@@ -113,13 +113,14 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_binary(left, operator, right),
-            Expression::Variable { name } => self.eval_variable(name),
+            Expression::Identifier { name } => self.eval_variable(name),
             Expression::Assignment { name, expression } => self.eval_assignment(name, expression),
             Expression::Logical {
                 left,
                 operator,
                 right,
             } => self.eval_logical(left, operator, right),
+            Expression::Call { name, arguments } => todo!(),
         }
     }
 

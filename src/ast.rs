@@ -35,7 +35,7 @@ pub enum Expression {
     Literal {
         value: LiteralValue,
     },
-    Variable {
+    Identifier {
         name: String,
     },
     Assignment {
@@ -58,6 +58,10 @@ pub enum Expression {
     },
     Grouping {
         expression: Box<Expression>,
+    },
+    Call {
+        callee: Box<Expression>,
+        arguments: Vec<Expression>,
     },
 }
 

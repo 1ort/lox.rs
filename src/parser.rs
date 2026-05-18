@@ -245,7 +245,7 @@ impl Parser {
         if let TokenType::Equal = self.peek().token_type {
             self.advance();
             match expr {
-                Expression::Variable { name } => {
+                Expression::Identifier { name } => {
                     let value = self.assignment()?;
                     return Ok(Expression::Assignment {
                         name: name.clone(),
@@ -379,7 +379,7 @@ impl Parser {
         let unary_operator = match self.peek().token_type {
             TokenType::Bang => UnaryOperator::Bang,
             TokenType::Minus => UnaryOperator::Minus,
-            _ => return self.primary(),
+            _ => return self.call(),
         };
         self.advance();
         let expr = self.unary()?;
@@ -389,8 +389,49 @@ impl Parser {
         })
     }
 
+    fn call(&mut self) -> ParserResult<Expression> {
+        let mut expr = self.primary()?;
+
+        loop {
+            match self.peek().token_type {
+                TokenType::LeftParen => {
+                    self.advance();
+                    expr = self.finish_call(Box::new(expr))?;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Box<Expression>) -> ParserResult<Expression> {
+        let mut args = Vec::new();
+        if !matches!(self.peek().token_type, TokenType::RightParen) {
+            loop {
+                if args.len() >= 255 {
+                    return Err("Can't have more than 255 arguments.".to_string());
+                }
+                args.push(self.expression()?);
+
+                if matches!(self.peek().token_type, TokenType::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+        self.expect_token(TokenType::RightParen, "Expect ')' after arguments.")?;
+
+        return Ok(Expression::Call {
+            callee,
+            arguments: args,
+        });
+    }
+
     fn primary(&mut self) -> ParserResult<Expression> {
-        use Expression::{Literal, Variable};
+        use Expression::{Identifier, Literal};
         use LiteralValue::*;
         let expression = match &self.peek().token_type {
             TokenType::False => Literal {
@@ -406,7 +447,7 @@ impl Parser {
             TokenType::String(string) => Literal {
                 value: String(string.clone()),
             },
-            TokenType::Identifier(name) => Variable { name: name.clone() },
+            TokenType::Identifier(name) => Identifier { name: name.clone() },
             _ => return self.grouping(),
         };
         self.advance();
