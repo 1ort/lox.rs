@@ -83,6 +83,10 @@ impl Parser {
                 self.advance();
                 self.while_statement()
             }
+            TokenType::For => {
+                self.advance();
+                self.for_statement()
+            }
             _ => self.expression_statement(),
         }
     }
@@ -135,6 +139,64 @@ impl Parser {
         let body = Box::new(self.statement()?);
 
         Ok(Statement::WhileLoop { condition, body })
+    }
+
+    fn for_statement(&mut self) -> ParserResult<Statement> {
+        self.expect_token(TokenType::LeftParen, "Expected '(' after 'for'.")?;
+        let maybe_initializer = match self.peek().token_type {
+            TokenType::Semicolon => {
+                self.advance();
+                None
+            }
+            TokenType::Var => {
+                self.advance();
+                Some(self.var_declaration()?)
+            }
+            _ => Some(self.expression_statement()?),
+        };
+
+        let condition = match self.peek().token_type {
+            TokenType::Semicolon => Expression::Literal {
+                value: LiteralValue::Boolean(true),
+            },
+            _ => self.expression()?,
+        };
+        self.expect_token(TokenType::Semicolon, "Expected ';' after condition.")?;
+
+        let maybe_increment = match self.peek().token_type {
+            TokenType::RightParen => None,
+            _ => Some(self.expression()?),
+        };
+        self.expect_token(TokenType::RightParen, "Expected ')' after 'for' clauses.")?;
+        let body = self.statement()?;
+
+        let while_body = if let Some(increment) = maybe_increment {
+            Statement::Block {
+                statements: vec![
+                    body,
+                    Statement::Expression {
+                        expression: Box::new(increment),
+                    },
+                ],
+            }
+        } else {
+            body
+        };
+
+        let while_loop = Statement::WhileLoop {
+            condition: Box::new(condition),
+            body: Box::new(while_body),
+        };
+
+        let statement = if let Some(initializer) = maybe_initializer {
+            Statement::Block {
+                statements: vec![initializer, while_loop],
+            }
+        } else {
+            while_loop
+        };
+
+        Ok(statement)
     }
 
     fn expression_statement(&mut self) -> ParserResult<Statement> {
