@@ -120,7 +120,7 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_logical(left, operator, right),
-            Expression::Call { name, arguments } => todo!(),
+            Expression::Call { callee, arguments } => self.eval_call_expr(callee, arguments),
         }
     }
 
@@ -198,5 +198,18 @@ impl Interpreter {
             }
         }
         self.eval_expression(right)
+    }
+
+    fn eval_call_expr(
+        &mut self,
+        callee: &Expression,
+        arguments: &[Expression],
+    ) -> EvalResult<LoxObject> {
+        let callee_obj = self.eval_expression(callee)?;
+        let arg_objs = arguments
+            .iter()
+            .map(|expr| self.eval_expression(expr))
+            .collect::<Result<Vec<LoxObject>, String>>()?;
+        callee_obj.call(arg_objs)
     }
 }

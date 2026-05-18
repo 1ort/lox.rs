@@ -8,6 +8,10 @@ pub enum LoxObject {
 }
 
 impl LoxObject {
+    pub fn call(&self, args: Vec<LoxObject>) -> EvalResult<LoxObject> {
+        todo!();
+    }
+
     pub fn bool_native(&self) -> bool {
         match self.bool().unwrap() {
             Self::Boolean(a) => a,
@@ -143,5 +147,9 @@ impl LoxObject {
             LoxObject::Boolean(val) => format!("{}", val),
             LoxObject::Nil => "Nil".to_string(),
         }
+    }
+
+    pub fn is_callable(&self) -> bool {
+        false
     }
 }
