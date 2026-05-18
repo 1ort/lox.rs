@@ -67,6 +67,7 @@ pub enum TokenType {
     This,
     True,
     While,
+    Break,
 }
 
 #[derive(Debug)]
@@ -189,6 +190,7 @@ impl<'a> Lexer<'a> {
                 "this" => TokenType::This,
                 "true" => TokenType::True,
                 "while" => TokenType::While,
+                "break" => TokenType::Break,
                 _ => TokenType::Identifier(buff.clone()),
             },
             lexeme: buff,

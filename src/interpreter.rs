@@ -64,10 +64,18 @@ impl Interpreter {
             }
             Statement::WhileLoop { condition, body } => {
                 while self.eval_expression(condition)?.bool_native() {
-                    self.exec_statement(body)?;
+                    if let Err(err) = self.exec_statement(body) {
+                        if err.eq("#break") {
+                            // TODO add error typing and do not compare strings
+                            break;
+                        } else {
+                            return Err(err);
+                        }
+                    }
                 }
                 Ok(())
             }
+            Statement::Break => Err("#break".to_string()),
         }
     }
     fn exec_block(

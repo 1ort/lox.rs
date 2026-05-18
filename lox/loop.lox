@@ -1,6 +1,15 @@
-print "Hello world!";
+// var x = 0;
+// while (x< 5) {
+//     x = x + 1;
+//     print x;
+// }
 
-var x = 0;
-while ((x=x+1) < 10) {
-    print x;
-  }
+var y = 0;
+while (y < 10) {
+  print y;
+  if (y==5) {
+      print "break";
+      break;
+    }
+  y = y+1;
+}

@@ -9,6 +9,7 @@ use crate::{
 struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    is_inside_loop: bool, // break is possible
 }
 
 type ParserError = String;
@@ -21,7 +22,11 @@ pub fn parse_program(tokens: Vec<Token>) -> ParserResult<Program> {
 
 impl Parser {
     fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, current: 0 }
+        Parser {
+            tokens,
+            current: 0,
+            is_inside_loop: false,
+        }
     }
 
     fn program(&mut self) -> ParserResult<Program> {
@@ -87,6 +92,15 @@ impl Parser {
                 self.advance();
                 self.for_statement()
             }
+            TokenType::Break => {
+                self.advance();
+                self.expect_token(TokenType::Semicolon, "Expected ';' after 'break'.")?;
+                if self.is_inside_loop {
+                    Ok(Statement::Break)
+                } else {
+                    Err("'break' outside of loop body.".to_string())
+                }
+            }
             _ => self.expression_statement(),
         }
     }
@@ -136,7 +150,9 @@ impl Parser {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'while'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after loop condition.")?;
+        self.is_inside_loop = true;
         let body = Box::new(self.statement()?);
+        self.is_inside_loop = false;
 
         Ok(Statement::WhileLoop { condition, body })
     }
@@ -168,7 +184,9 @@ impl Parser {
             _ => Some(self.expression()?),
         };
         self.expect_token(TokenType::RightParen, "Expected ')' after 'for' clauses.")?;
+        self.is_inside_loop = true;
         let body = self.statement()?;
+        self.is_inside_loop = false;
 
         let while_body = if let Some(increment) = maybe_increment {
             Statement::Block {

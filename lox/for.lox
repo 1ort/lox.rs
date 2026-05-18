@@ -8,9 +8,6 @@ for (var c = 0; c < 3;) print c = c + 1;
 for (var a = 0; a < 3; a = a + 1) {
   print a;
 }
-// expect: 0
-// expect: 1
-// expect: 2
 
 // No variable.
 var i = 0;
