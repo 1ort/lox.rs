@@ -1,3 +1,5 @@
+use crate::function::Function;
+
 pub type EvalResult<T> = Result<T, String>;
 #[derive(Debug, Clone)]
 pub enum LoxObject {
@@ -5,13 +7,10 @@ pub enum LoxObject {
     String(String),
     Boolean(bool),
     Nil,
+    Function(Function),
 }
 
 impl LoxObject {
-    pub fn call(&self, args: Vec<LoxObject>) -> EvalResult<LoxObject> {
-        todo!();
-    }
-
     pub fn bool_native(&self) -> bool {
         match self.bool().unwrap() {
             Self::Boolean(a) => a,
@@ -146,10 +145,7 @@ impl LoxObject {
             LoxObject::String(val) => val.to_string(),
             LoxObject::Boolean(val) => format!("{}", val),
             LoxObject::Nil => "Nil".to_string(),
+            LoxObject::Function(function) => function.format(),
         }
-    }
-
-    pub fn is_callable(&self) -> bool {
-        false
     }
 }

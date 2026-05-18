@@ -7,6 +7,8 @@ use std::process;
 
 mod ast;
 mod environment;
+mod function;
+mod globals;
 mod interpreter;
 mod object;
 mod parser;

@@ -4,14 +4,17 @@ use crate::ast::{
 use crate::environment::Environment;
 use crate::object::{EvalResult, LoxObject};
 
+use crate::globals;
+
 pub struct Interpreter {
     environment: Box<Environment>,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let mut globals = globals::build_globals();
         Interpreter {
-            environment: Box::new(Environment::new()),
+            environment: Box::new(globals),
         }
     }
 
@@ -210,6 +213,9 @@ impl Interpreter {
             .iter()
             .map(|expr| self.eval_expression(expr))
             .collect::<Result<Vec<LoxObject>, String>>()?;
-        callee_obj.call(arg_objs)
+        match callee_obj {
+            LoxObject::Function(func) => Ok(func.call(&arg_objs)?),
+            _ => Err(format!("'{}' is not callable", callee_obj.format())),
+        }
     }
 }

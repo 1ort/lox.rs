@@ -121,7 +121,7 @@ impl<'a> Lexer<'a> {
             Ok(Some(self.lex_number()?))
         } else if c == &'"' {
             Ok(Some(self.lex_string()?))
-        } else if c.is_ascii_alphanumeric() {
+        } else if c.is_ascii_alphanumeric() || matches!(c, '_' | '-') {
             Ok(Some(self.lex_keyword_or_identifier()))
         } else {
             self.lex_symbol()
@@ -170,7 +170,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_keyword_or_identifier(self: &mut Lexer<'a>) -> Token {
-        let buff = self.take_till(|c| c.is_ascii_alphanumeric());
+        let buff = self.take_till(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'));
 
         Token {
             token_type: match buff.as_str() {
