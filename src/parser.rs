@@ -76,6 +76,7 @@ impl Parser {
                     return Err("Expected function parameter to be identifier.".to_string());
                 };
                 parameters.push(param);
+                self.advance();
 
                 if matches!(self.peek().token_type, TokenType::Comma) {
                     self.advance();

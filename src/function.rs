@@ -34,7 +34,11 @@ impl Function {
         }
     }
 
-    pub fn call(&self, args: &[LoxObject], interpreter: &Interpreter) -> Result<LoxObject, String> {
+    pub fn call(
+        &self,
+        args: &[LoxObject],
+        interpreter: &mut Interpreter,
+    ) -> Result<LoxObject, String> {
         if self.arity() as usize != args.len() {
             return Err(format!(
                 "{} takes {} arguments, but {} provided",
@@ -53,7 +57,7 @@ impl Function {
                 let mut environment = Environment::new();
                 std::iter::zip(parameters, args)
                     .map(|(name, value)| environment.define(name.clone(), value.clone()))
-                    .collect();
+                    .collect::<Vec<_>>();
 
                 interpreter.enter_environment(Box::new(environment));
                 interpreter.exec_statement(code_block)?;
