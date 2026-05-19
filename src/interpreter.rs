@@ -79,27 +79,49 @@ impl Interpreter {
                 Ok(())
             }
             Statement::Break => Err("#break".to_string()),
+            Statement::FunctionDeclaration {
+                name,
+                parameters,
+                body,
+            } => {
+                self.environment.define(
+                    name.clone(),
+                    LoxObject::Function(crate::function::Function::Defined {
+                        name: name.clone(),
+                        parameters: parameters.clone(),
+                        code_block: body.clone(),
+                    }),
+                );
+                Ok(())
+            }
         }
     }
+
+    pub fn enter_environment(&mut self, environment: Box<Environment>) {
+        use std::mem::replace;
+
+        let current_env = replace(&mut self.environment, environment);
+        self.environment.set_enclosing(Some(current_env));
+    }
+
+    pub fn exit_environment(&mut self) {
+        let current_env = self.environment.enclosing.take();
+        match current_env {
+            Some(boxed_env) => self.environment = boxed_env,
+            None => panic!("can not unwrap environment stack"),
+        };
+    }
+
     fn exec_block(
         &mut self,
         statements: &Vec<Statement>,
         environment: Box<Environment>,
     ) -> EvalResult<()> {
-        use std::mem::replace;
-
-        let current_env = replace(&mut self.environment, environment);
-        self.environment.set_enclosing(Some(current_env));
-
+        self.enter_environment(environment);
         for statement in statements {
             self.exec_statement(statement)?;
         }
-
-        let current_env = self.environment.enclosing.take();
-        match current_env {
-            Some(boxed_env) => self.environment = boxed_env,
-            None => return Err("Unexpected error: can not unwrap environment stack".to_string()),
-        }
+        self.exit_environment();
         Ok(())
     }
 
@@ -214,7 +236,7 @@ impl Interpreter {
             .map(|expr| self.eval_expression(expr))
             .collect::<Result<Vec<LoxObject>, String>>()?;
         match callee_obj {
-            LoxObject::Function(func) => Ok(func.call(&arg_objs)?),
+            LoxObject::Function(func) => Ok(func.call(&arg_objs, self)?),
             _ => Err(format!("'{}' is not callable", callee_obj.format())),
         }
     }

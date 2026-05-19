@@ -42,12 +42,58 @@ impl Parser {
     }
     fn declaration(&mut self) -> ParserResult<Statement> {
         match self.peek().token_type {
+            TokenType::Fun => {
+                self.advance();
+                self.fun_declaration()
+            }
             TokenType::Var => {
                 self.advance();
                 self.var_declaration()
             }
             _ => self.statement(),
         }
+    }
+
+    fn fun_declaration(&mut self) -> ParserResult<Statement> {
+        let name = if let TokenType::Identifier(name) = &self.peek().token_type {
+            name.clone()
+        } else {
+            return Err("Expected function name after 'fun'.".to_string());
+        };
+        self.advance();
+        self.expect_token(TokenType::LeftParen, "Expected '(' after function name")?;
+
+        let mut parameters = Vec::new();
+        if !matches!(self.peek().token_type, TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    return Err("Function can't have more than 255 params.".to_string());
+                }
+
+                let param = if let TokenType::Identifier(param) = &self.peek().token_type {
+                    param.clone()
+                } else {
+                    return Err("Expected function parameter to be identifier.".to_string());
+                };
+                parameters.push(param);
+
+                if matches!(self.peek().token_type, TokenType::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+        self.expect_token(TokenType::RightParen, "Expect ')' after function params.")?;
+        self.expect_token(TokenType::LeftBrace, "Expect '{' before function body.")?;
+
+        let block = self.block_statement()?;
+
+        return Ok(Statement::FunctionDeclaration {
+            name,
+            parameters,
+            body: Box::new(block),
+        });
     }
 
     fn var_declaration(&mut self) -> ParserResult<Statement> {

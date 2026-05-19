@@ -3,7 +3,7 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Expression {
         expression: Box<Expression>,
@@ -28,9 +28,14 @@ pub enum Statement {
         body: Box<Statement>,
     },
     Break,
+    FunctionDeclaration {
+        name: String,
+        parameters: Vec<String>,
+        body: Box<Statement>,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Literal {
         value: LiteralValue,
@@ -65,7 +70,7 @@ pub enum Expression {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiteralValue {
     Number(f64),
     String(String),
@@ -73,13 +78,13 @@ pub enum LiteralValue {
     Nil,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOperator {
     Bang,
     Minus,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOperator {
     EqualEqual,
     BangEqual,
@@ -93,7 +98,7 @@ pub enum BinaryOperator {
     Star,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LogicalOperator {
     Or,
     And,
