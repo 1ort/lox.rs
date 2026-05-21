@@ -10,6 +10,7 @@ mod environment;
 mod function;
 mod globals;
 mod interpreter;
+mod interruption;
 mod object;
 mod parser;
 mod runner;
@@ -30,8 +31,8 @@ fn main() {
 
 fn run_file(lox: &mut Lox, filename: String) {
     let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
-    lox.run(&contents);
-    if lox.had_error() {
+    let err = lox.run(&contents);
+    if err.is_some() {
         process::exit(65);
     }
 }

@@ -1,25 +1,9 @@
-use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
-#[derive(Debug, Clone)]
-pub struct LexerError {
-    pub line: usize,
-    pub lexeme: String,
-    pub message: String,
-}
+use crate::interruption::{Interruption, lexer_error};
 
-impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "[line {}] Lexer error: \"{}\": {}",
-            self.line, self.message, self.lexeme
-        )
-    }
-}
-
-type LexerResult<T> = std::result::Result<T, LexerError>;
+// type LexerResult<T> = std::result::Result<T, LexerError>;
 
 #[derive(Debug, PartialEq)]
 pub enum TokenType {
@@ -84,7 +68,7 @@ struct Lexer<'s> {
     current_line: usize,
 }
 
-pub fn scan_tokens(source: String) -> LexerResult<Vec<Token>> {
+pub fn scan_tokens(source: String) -> Result<Vec<Token>, Interruption> {
     let mut tokens = Vec::new();
     let mut lexer = Lexer {
         source: source.chars().peekable(),
@@ -104,7 +88,7 @@ pub fn scan_tokens(source: String) -> LexerResult<Vec<Token>> {
 }
 
 impl<'a> Lexer<'a> {
-    fn lex(self: &mut Lexer<'a>) -> LexerResult<Option<Token>> {
+    fn lex(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
         let c = self.source.peek();
         if c.is_none() {
             return Ok(None);
@@ -128,17 +112,17 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_number(self: &mut Lexer<'a>) -> LexerResult<Token> {
+    fn lex_number(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
         let mut buff = self.take_till(|c| c.is_ascii_digit());
         if self.source.peek() == Some(&'.') {
             buff.push(self.source.next().unwrap());
             let fract = self.take_till(|c| c.is_ascii_digit());
             if fract.is_empty() {
-                return Err(LexerError {
-                    lexeme: buff,
-                    line: self.current_line,
-                    message: "Invalid number. Fractional part expected.".to_string(),
-                });
+                return Err(lexer_error(
+                    buff,
+                    self.current_line,
+                    "Invalid number. Fractional part expected.".to_string(),
+                ));
             }
             buff.push_str(&fract);
         }
@@ -150,7 +134,7 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn lex_string(self: &mut Lexer<'a>) -> LexerResult<Token> {
+    fn lex_string(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
         self.source.next().unwrap();
         let content = self.take_till(|c| c.ne(&'"'));
 
@@ -161,11 +145,11 @@ impl<'a> Lexer<'a> {
                 line: self.current_line,
             })
         } else {
-            Err(LexerError {
-                lexeme: format!("\"{content}"),
-                line: self.current_line,
-                message: "Unterminated string.".to_string(),
-            })
+            Err(lexer_error(
+                format!("\"{content}"),
+                self.current_line,
+                "Unterminated string.".to_string(),
+            ))
         }
     }
 
@@ -198,7 +182,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_symbol(self: &mut Lexer<'a>) -> LexerResult<Option<Token>> {
+    fn lex_symbol(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
         let c = self.source.next().unwrap();
 
         let token_type = match c {
@@ -249,11 +233,11 @@ impl<'a> Lexer<'a> {
                 }
             }
             _ => {
-                return Err(LexerError {
-                    lexeme: c.to_string(),
-                    line: self.current_line,
-                    message: "Unexpected token".to_string(),
-                });
+                return Err(lexer_error(
+                    c.to_string(),
+                    self.current_line,
+                    "Unexpected token".to_string(),
+                ));
             }
         };
 
