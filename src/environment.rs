@@ -34,7 +34,7 @@ impl Environment {
 
     pub fn get(&self, name: &String) -> Result<LoxObject, Interruption> {
         if let Some(value) = self.values.get(name) {
-            return Ok(value.clone());
+            Ok(value.clone())
         } else {
             if let Some(ref enclosing) = self.enclosing {
                 enclosing.borrow().get(name)
@@ -47,7 +47,7 @@ impl Environment {
     pub fn assign(&mut self, name: &String, value: LoxObject) -> Result<(), Interruption> {
         if self.values.contains_key(name) {
             self.values.insert(name.clone(), value);
-            return Ok(());
+            Ok(())
         } else {
             if let Some(ref enclosing) = self.enclosing {
                 enclosing.borrow_mut().assign(name, value)

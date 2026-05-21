@@ -106,11 +106,11 @@ impl Parser {
             stmt
         };
 
-        return Ok(Statement::FunctionDeclaration {
+        Ok(Statement::FunctionDeclaration {
             name,
             parameters,
             body: Box::new(block),
-        });
+        })
     }
 
     fn var_declaration(&mut self) -> Result<Statement, Interruption> {
@@ -481,16 +481,9 @@ impl Parser {
     fn call(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.primary()?;
 
-        loop {
-            match self.peek().token_type {
-                TokenType::LeftParen => {
-                    self.advance();
-                    expr = self.finish_call(Box::new(expr))?;
-                }
-                _ => {
-                    break;
-                }
-            }
+        while let TokenType::LeftParen = self.peek().token_type {
+            self.advance();
+            expr = self.finish_call(Box::new(expr))?;
         }
         Ok(expr)
     }
@@ -516,10 +509,10 @@ impl Parser {
         }
         self.expect_token(TokenType::RightParen, "Expect ')' after arguments.")?;
 
-        return Ok(Expression::Call {
+        Ok(Expression::Call {
             callee,
             arguments: args,
-        });
+        })
     }
 
     fn primary(&mut self) -> Result<Expression, Interruption> {

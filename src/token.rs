@@ -1,5 +1,3 @@
-use std::clone;
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Eof,

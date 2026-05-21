@@ -4,13 +4,12 @@ use std::rc::Rc;
 use crate::ast::{
     BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement, UnaryOperator,
 };
-use crate::environment::{self, EnvRef, Environment};
+use crate::environment::{EnvRef, Environment};
 use crate::function::Function;
 use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
 use crate::object::LoxObject;
 
 use crate::globals;
-use crate::runner::Lox;
 
 pub struct Interpreter {
     pub environment: EnvRef,
@@ -40,7 +39,6 @@ impl Interpreter {
     pub fn exec_statement(&mut self, statement: &Statement) -> Result<(), Interruption> {
         match statement {
             Statement::Block { statements } => {
-                let env = Environment::new_local(Rc::clone(&self.environment));
                 self.exec_block(statements)?;
                 Ok(())
             }
