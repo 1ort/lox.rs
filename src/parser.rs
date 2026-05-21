@@ -3,7 +3,7 @@ use crate::{
         BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement,
         UnaryOperator,
     },
-    scanner::{Token, TokenType},
+    token::{Token, TokenType},
 };
 
 struct Parser {

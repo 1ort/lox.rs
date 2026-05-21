@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::scanner::Token;
+use crate::token::Token;
 
 #[derive(Debug)]
 pub enum Interruption {
