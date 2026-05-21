@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::object::LoxObject;
+use crate::{
+    interruption::{Interruption, runtime_error},
+    object::LoxObject,
+};
 
 #[derive(Debug)]
 pub struct Environment {
@@ -24,24 +27,24 @@ impl Environment {
         self.values.insert(name, value);
     }
 
-    pub fn get(&mut self, name: &String) -> Result<&LoxObject, String> {
+    pub fn get(&mut self, name: &String) -> Result<&LoxObject, Interruption> {
         if let Some(value) = self.values.get(name) {
             return Ok(value);
         }
         match self.enclosing.as_mut() {
             Some(env) => env.get(name),
-            None => Err(format!("Undefined variable: {} .", name)),
+            None => Err(runtime_error(format!("Undefined variable: {} .", name))),
         }
     }
 
-    pub fn assign(&mut self, name: &String, value: LoxObject) -> Result<(), String> {
+    pub fn assign(&mut self, name: &String, value: LoxObject) -> Result<(), Interruption> {
         if self.values.contains_key(name) {
             self.values.insert(name.clone(), value);
             return Ok(());
         }
         match self.enclosing.as_mut() {
             Some(env) => env.assign(name, value),
-            None => Err(format!("Undefined variable: {} .", name)),
+            None => Err(runtime_error(format!("Undefined variable: {} .", name))),
         }
     }
 }

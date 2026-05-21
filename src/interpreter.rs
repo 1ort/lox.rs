@@ -2,7 +2,8 @@ use crate::ast::{
     BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement, UnaryOperator,
 };
 use crate::environment::Environment;
-use crate::object::{EvalResult, LoxObject};
+use crate::interruption::{Interruption, brake_inter, runtime_error};
+use crate::object::LoxObject;
 
 use crate::globals;
 
@@ -12,13 +13,13 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let mut globals = globals::build_globals();
+        let globals = globals::build_globals();
         Interpreter {
             environment: Box::new(globals),
         }
     }
 
-    pub fn exec(&mut self, program: &Program) -> EvalResult<()> {
+    pub fn exec(&mut self, program: &Program) -> Result<(), Interruption> {
         let mut iterator = program.statements.iter();
 
         for result in iterator.by_ref().map(|stmt| self.exec_statement(stmt)) {
@@ -29,7 +30,7 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn exec_statement(&mut self, statement: &Statement) -> EvalResult<()> {
+    pub fn exec_statement(&mut self, statement: &Statement) -> Result<(), Interruption> {
         match statement {
             Statement::Block { statements } => {
                 self.exec_block(statements, Box::new(Environment::new()))?;
@@ -68,17 +69,17 @@ impl Interpreter {
             Statement::WhileLoop { condition, body } => {
                 while self.eval_expression(condition)?.bool_native() {
                     if let Err(err) = self.exec_statement(body) {
-                        if err.eq("#break") {
-                            // TODO add error typing and do not compare strings
-                            break;
-                        } else {
-                            return Err(err);
+                        match err {
+                            Interruption::Break => {
+                                break;
+                            }
+                            _ => return Err(err),
                         }
                     }
                 }
                 Ok(())
             }
-            Statement::Break => Err("#break".to_string()),
+            Statement::Break => Err(brake_inter()),
             Statement::FunctionDeclaration {
                 name,
                 parameters,
@@ -116,7 +117,7 @@ impl Interpreter {
         &mut self,
         statements: &Vec<Statement>,
         environment: Box<Environment>,
-    ) -> EvalResult<()> {
+    ) -> Result<(), Interruption> {
         self.enter_environment(environment);
         for statement in statements {
             self.exec_statement(statement)?;
@@ -125,7 +126,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn eval_expression(&mut self, expr: &Expression) -> EvalResult<LoxObject> {
+    fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, Interruption> {
         match expr {
             Expression::Grouping { expression } => self.eval_expression(expression),
             Expression::Literal { value } => self.eval_literal_value(value),
@@ -149,18 +150,22 @@ impl Interpreter {
         }
     }
 
-    fn eval_variable(&mut self, name: &String) -> EvalResult<LoxObject> {
+    fn eval_variable(&mut self, name: &String) -> Result<LoxObject, Interruption> {
         let obj_ref = self.environment.get(name)?;
         Ok(obj_ref.clone())
     }
 
-    fn eval_assignment(&mut self, name: &String, expression: &Expression) -> EvalResult<LoxObject> {
+    fn eval_assignment(
+        &mut self,
+        name: &String,
+        expression: &Expression,
+    ) -> Result<LoxObject, Interruption> {
         let value = self.eval_expression(expression)?;
         self.environment.assign(name, value.clone())?;
         Ok(value)
     }
 
-    fn eval_literal_value(&mut self, val: &LiteralValue) -> EvalResult<LoxObject> {
+    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<LoxObject, Interruption> {
         Ok(match val {
             LiteralValue::Number(num) => LoxObject::Number(*num),
             LiteralValue::String(s) => LoxObject::String(s.clone()),
@@ -173,7 +178,7 @@ impl Interpreter {
         &mut self,
         operator: &UnaryOperator,
         expression: &Expression,
-    ) -> EvalResult<LoxObject> {
+    ) -> Result<LoxObject, Interruption> {
         let expr_value = self.eval_expression(expression)?;
         match operator {
             UnaryOperator::Minus => expr_value.neg(),
@@ -185,7 +190,7 @@ impl Interpreter {
         left: &Expression,
         operator: &BinaryOperator,
         right: &Expression,
-    ) -> EvalResult<LoxObject> {
+    ) -> Result<LoxObject, Interruption> {
         let left = self.eval_expression(left)?;
         let right = self.eval_expression(right)?;
 
@@ -208,7 +213,7 @@ impl Interpreter {
         left: &Expression,
         operator: &LogicalOperator,
         right: &Expression,
-    ) -> EvalResult<LoxObject> {
+    ) -> Result<LoxObject, Interruption> {
         let left_result = self.eval_expression(left)?;
         match operator {
             LogicalOperator::Or => {
@@ -229,15 +234,18 @@ impl Interpreter {
         &mut self,
         callee: &Expression,
         arguments: &[Expression],
-    ) -> EvalResult<LoxObject> {
+    ) -> Result<LoxObject, Interruption> {
         let callee_obj = self.eval_expression(callee)?;
         let arg_objs = arguments
             .iter()
             .map(|expr| self.eval_expression(expr))
-            .collect::<Result<Vec<LoxObject>, String>>()?;
+            .collect::<Result<Vec<LoxObject>, Interruption>>()?;
         match callee_obj {
             LoxObject::Function(func) => Ok(func.call(&arg_objs, self)?),
-            _ => Err(format!("'{}' is not callable", callee_obj.format())),
+            _ => Err(runtime_error(format!(
+                "'{}' is not callable",
+                callee_obj.format()
+            ))),
         }
     }
 }

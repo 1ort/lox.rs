@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::{interpreter::Interpreter, parser::parse_program, scanner};
+use crate::{interpreter::Interpreter, interruption::Interruption, parser::parse_program, scanner};
 
 pub struct Lox {
     interpreter: Interpreter,
@@ -13,7 +13,7 @@ impl Lox {
         }
     }
 
-    pub fn run(&mut self, source: &str) -> Option<Box<String>> {
+    pub fn run(&mut self, source: &str) -> Option<Box<Interruption>> {
         let tokens = scanner::scan_tokens(source.to_string());
         match tokens {
             Ok(tokens) => {
@@ -21,28 +21,24 @@ impl Lox {
                 match parse_program(tokens) {
                     Ok(program) => {
                         //println!("{:#?}", program);
-                        if let Err(err) = self.interpreter.exec(&program) {
-                            self.error(0, &err);
-                            return Some(Box::new(err));
+                        if let Err(error) = self.interpreter.exec(&program) {
+                            self.report(&error);
+                            Some(Box::new(error))
                         } else {
-                            return None;
+                            None
                         }
                     }
                     Err(error) => {
                         self.report(&error);
-                        return Some(Box::new(error.to_string()));
+                        Some(Box::new(error))
                     }
                 }
             }
             Err(error) => {
                 self.report(&error);
-                return Some(Box::new(error.to_string()));
+                Some(Box::new(error))
             }
         }
-    }
-
-    fn error(&mut self, line: usize, message: &str) {
-        println!("[line {}] Error {}", line, message);
     }
 
     fn report(&mut self, error: impl Error) {

@@ -1,5 +1,6 @@
 use crate::environment::Environment;
 use crate::function::Function;
+use crate::interruption::runtime_error;
 use crate::object::LoxObject;
 
 use std::thread;
@@ -33,10 +34,10 @@ pub fn build_globals() -> Environment {
                     thread::sleep(Duration::from_secs_f64(secs));
                     Ok(LoxObject::Nil)
                 }
-                _ => Err(format!(
+                _ => Err(runtime_error(format!(
                     "Function 'sleep' expects number, but '{}' was provided.",
                     duration.format()
-                )),
+                ))),
             }
         },
     });

@@ -1,7 +1,8 @@
 use crate::{
     ast::Statement,
-    environment::{self, Environment},
+    environment::Environment,
     interpreter::Interpreter,
+    interruption::{Interruption, runtime_error},
     object::LoxObject,
 };
 
@@ -10,7 +11,7 @@ pub enum Function {
     Native {
         identifier: String,
         arity: u8,
-        callable: fn(&[LoxObject]) -> Result<LoxObject, String>,
+        callable: fn(&[LoxObject]) -> Result<LoxObject, Interruption>,
     },
     Defined {
         name: String,
@@ -38,21 +39,21 @@ impl Function {
         &self,
         args: &[LoxObject],
         interpreter: &mut Interpreter,
-    ) -> Result<LoxObject, String> {
+    ) -> Result<LoxObject, Interruption> {
         if self.arity() as usize != args.len() {
-            return Err(format!(
+            return Err(runtime_error(format!(
                 "{} takes {} arguments, but {} provided",
                 self.format(),
                 self.arity(),
                 args.len()
-            ));
+            )));
         }
         match self {
             Function::Native { callable, .. } => Ok(callable(args)?),
             Function::Defined {
-                name,
                 parameters,
                 code_block,
+                ..
             } => {
                 let mut environment = Environment::new();
                 std::iter::zip(parameters, args)
