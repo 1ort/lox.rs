@@ -10,7 +10,8 @@ use crate::{
 struct Parser {
     tokens: Vec<Token>,
     current: usize,
-    is_inside_loop: bool, // break is possible
+    is_inside_loop: bool,          // break is possible
+    is_inside_function_body: bool, // return is possible
 }
 
 pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Interruption> {
@@ -24,6 +25,7 @@ impl Parser {
             tokens,
             current: 0,
             is_inside_loop: false,
+            is_inside_function_body: false,
         }
     }
 
@@ -95,7 +97,14 @@ impl Parser {
         self.expect_token(TokenType::RightParen, "Expect ')' after function params.")?;
         self.expect_token(TokenType::LeftBrace, "Expect '{' before function body.")?;
 
-        let block = self.block_statement()?;
+        let block = if self.is_inside_function_body {
+            self.block_statement()?
+        } else {
+            self.is_inside_function_body = true;
+            let stmt = self.block_statement()?;
+            self.is_inside_function_body = false;
+            stmt
+        };
 
         return Ok(Statement::FunctionDeclaration {
             name,
@@ -155,6 +164,10 @@ impl Parser {
                     Err(parser_error(tok, "'break' outside of loop body."))
                 }
             }
+            TokenType::Return => {
+                self.advance();
+                self.return_statement()
+            }
             _ => self.expression_statement(),
         }
     }
@@ -204,9 +217,15 @@ impl Parser {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'while'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after loop condition.")?;
-        self.is_inside_loop = true;
-        let body = Box::new(self.statement()?);
-        self.is_inside_loop = false;
+
+        let body = if self.is_inside_loop {
+            Box::new(self.statement()?)
+        } else {
+            self.is_inside_loop = true;
+            let stmt = Box::new(self.statement()?);
+            self.is_inside_loop = false;
+            stmt
+        };
 
         Ok(Statement::WhileLoop { condition, body })
     }
@@ -269,6 +288,22 @@ impl Parser {
         };
 
         Ok(statement)
+    }
+
+    fn return_statement(&mut self) -> Result<Statement, Interruption> {
+        match self.peek().token_type {
+            TokenType::Semicolon => {
+                self.advance();
+                Ok(Statement::Return { expresstion: None })
+            }
+            _ => {
+                let stmt = Ok(Statement::Return {
+                    expresstion: Some(Box::new(self.expression()?)),
+                });
+                self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
+                stmt
+            }
+        }
     }
 
     fn expression_statement(&mut self) -> Result<Statement, Interruption> {

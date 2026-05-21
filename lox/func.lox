@@ -1,6 +1,8 @@
-fun print_sum(a, b) {
-    print a+b;
+fun sum(a, b) {
+    return a+b;
   }
 
-print_sum(1, 2);
-print_sum("hello", " world");
+print sum(1, 2);
+print sum("hello", " world");
+print sum(-2, 5);
+

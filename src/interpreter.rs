@@ -1,21 +1,28 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::ast::{
     BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement, UnaryOperator,
 };
-use crate::environment::Environment;
-use crate::interruption::{Interruption, brake_inter, runtime_error};
+use crate::environment::{self, EnvRef, Environment};
+use crate::function::Function;
+use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
 use crate::object::LoxObject;
 
 use crate::globals;
+use crate::runner::Lox;
 
 pub struct Interpreter {
-    environment: Box<Environment>,
+    pub environment: EnvRef,
+    pub globals: EnvRef,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let globals = globals::build_globals();
+        let globals = Rc::new(RefCell::new(globals::build_globals()));
         Interpreter {
-            environment: Box::new(globals),
+            globals: Rc::clone(&globals),
+            environment: Rc::clone(&globals),
         }
     }
 
@@ -33,7 +40,8 @@ impl Interpreter {
     pub fn exec_statement(&mut self, statement: &Statement) -> Result<(), Interruption> {
         match statement {
             Statement::Block { statements } => {
-                self.exec_block(statements, Box::new(Environment::new()))?;
+                let env = Environment::new_local(Rc::clone(&self.environment));
+                self.exec_block(statements)?;
                 Ok(())
             }
             Statement::Expression { expression } => {
@@ -51,7 +59,7 @@ impl Interpreter {
                 } else {
                     LoxObject::Nil
                 };
-                self.environment.define(name.clone(), value);
+                self.environment.borrow_mut().define(name.clone(), value);
                 Ok(())
             }
             Statement::Conditional {
@@ -85,7 +93,7 @@ impl Interpreter {
                 parameters,
                 body,
             } => {
-                self.environment.define(
+                self.environment.borrow_mut().define(
                     name.clone(),
                     LoxObject::Function(crate::function::Function::Defined {
                         name: name.clone(),
@@ -95,35 +103,27 @@ impl Interpreter {
                 );
                 Ok(())
             }
+            Statement::Return { expresstion } => {
+                let expr_result = match expresstion {
+                    None => LoxObject::Nil,
+                    Some(expr) => self.eval_expression(expr)?,
+                };
+                Err(retun_inter(expr_result))
+            }
         }
     }
 
-    pub fn enter_environment(&mut self, environment: Box<Environment>) {
-        use std::mem::replace;
+    fn exec_block(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
+        let old_env_ref = Rc::clone(&self.environment);
+        let new_env = Environment::new_local(Rc::clone(&self.environment));
+        self.environment = Rc::new(RefCell::new(new_env));
 
-        let current_env = replace(&mut self.environment, environment);
-        self.environment.set_enclosing(Some(current_env));
-    }
+        let res: Result<(), Interruption> = statements
+            .iter()
+            .try_for_each(|stmt| self.exec_statement(stmt));
 
-    pub fn exit_environment(&mut self) {
-        let current_env = self.environment.enclosing.take();
-        match current_env {
-            Some(boxed_env) => self.environment = boxed_env,
-            None => panic!("can not unwrap environment stack"),
-        };
-    }
-
-    fn exec_block(
-        &mut self,
-        statements: &Vec<Statement>,
-        environment: Box<Environment>,
-    ) -> Result<(), Interruption> {
-        self.enter_environment(environment);
-        for statement in statements {
-            self.exec_statement(statement)?;
-        }
-        self.exit_environment();
-        Ok(())
+        self.environment = old_env_ref;
+        res
     }
 
     fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, Interruption> {
@@ -151,7 +151,7 @@ impl Interpreter {
     }
 
     fn eval_variable(&mut self, name: &String) -> Result<LoxObject, Interruption> {
-        let obj_ref = self.environment.get(name)?;
+        let obj_ref = self.environment.borrow().get(name)?;
         Ok(obj_ref.clone())
     }
 
@@ -161,7 +161,7 @@ impl Interpreter {
         expression: &Expression,
     ) -> Result<LoxObject, Interruption> {
         let value = self.eval_expression(expression)?;
-        self.environment.assign(name, value.clone())?;
+        self.environment.borrow_mut().assign(name, value.clone())?;
         Ok(value)
     }
 
@@ -233,19 +233,66 @@ impl Interpreter {
     fn eval_call_expr(
         &mut self,
         callee: &Expression,
-        arguments: &[Expression],
+        argument_expressions: &[Expression],
     ) -> Result<LoxObject, Interruption> {
         let callee_obj = self.eval_expression(callee)?;
-        let arg_objs = arguments
+        let args = argument_expressions
             .iter()
             .map(|expr| self.eval_expression(expr))
             .collect::<Result<Vec<LoxObject>, Interruption>>()?;
         match callee_obj {
-            LoxObject::Function(func) => Ok(func.call(&arg_objs, self)?),
+            LoxObject::Function(func) => {
+                if func.arity() as usize != args.len() {
+                    return Err(runtime_error(format!(
+                        "{} takes {} arguments, but {} provided",
+                        func.format(),
+                        func.arity(),
+                        args.len()
+                    )));
+                };
+
+                match func {
+                    Function::Native { callable, .. } => Ok(callable(&args)?),
+                    Function::Defined {
+                        parameters,
+                        code_block,
+                        ..
+                    } => self.eval_call(&parameters, &code_block, &args),
+                }
+            }
             _ => Err(runtime_error(format!(
                 "'{}' is not callable",
                 callee_obj.format()
             ))),
         }
+    }
+
+    fn eval_call(
+        &mut self,
+        parameters: &[String],
+        code_block: &Statement,
+        args: &[LoxObject],
+    ) -> Result<LoxObject, Interruption> {
+        let environment = Environment::new_local(Rc::clone(&self.globals));
+        let old_environment = Rc::clone(&self.environment);
+
+        self.environment = Rc::new(RefCell::new(environment));
+
+        let _ = std::iter::zip(parameters, args)
+            .map(|(name, value)| {
+                self.environment
+                    .borrow_mut()
+                    .define(name.clone(), value.clone())
+            })
+            .collect::<Vec<_>>();
+
+        let result = match self.exec_statement(code_block) {
+            Ok(_) => LoxObject::Nil,
+            Err(Interruption::Return { object }) => object,
+            Err(error) => return Err(error),
+        };
+
+        self.environment = old_environment;
+        Ok(result)
     }
 }

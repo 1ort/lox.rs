@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
+use crate::object::LoxObject;
 use crate::token::Token;
 
 #[derive(Debug)]
@@ -18,6 +19,9 @@ pub enum Interruption {
         message: String,
     },
     Break,
+    Return {
+        object: LoxObject,
+    },
 }
 
 impl Display for Interruption {
@@ -39,6 +43,7 @@ impl Display for Interruption {
                 f.write_fmt(format_args!("Runtime error. {}", message))
             }
             Interruption::Break => f.write_str("#break"),
+            Interruption::Return { object } => f.write_fmt(format_args!("#return {:?}", object,)),
         }
     }
 }
@@ -66,4 +71,8 @@ pub fn runtime_error(message: String) -> Interruption {
 
 pub fn brake_inter() -> Interruption {
     Interruption::Break
+}
+
+pub fn retun_inter(object: LoxObject) -> Interruption {
+    Interruption::Return { object }
 }

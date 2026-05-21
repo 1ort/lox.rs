@@ -8,7 +8,7 @@ use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn build_globals() -> Environment {
-    let mut globals = Environment::new();
+    let mut globals = Environment::new_global();
 
     let clock = LoxObject::Function(Function::Native {
         identifier: "clock".to_string(),

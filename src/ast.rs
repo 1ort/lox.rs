@@ -33,6 +33,9 @@ pub enum Statement {
         parameters: Vec<String>,
         body: Box<Statement>,
     },
+    Return {
+        expresstion: Option<Box<Expression>>,
+    },
 }
 
 #[derive(Debug, Clone)]
