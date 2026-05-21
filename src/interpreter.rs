@@ -50,7 +50,7 @@ impl Interpreter {
             }
             Statement::Print { expression } => {
                 let obj = self.eval_expression(expression)?;
-                println!("{}", obj.format());
+                println!("{}", obj);
                 Ok(())
             }
             Statement::VarDeclaration { name, initializer } => {
@@ -99,6 +99,7 @@ impl Interpreter {
                         name: name.clone(),
                         parameters: parameters.clone(),
                         code_block: body.clone(),
+                        closure: Rc::clone(&self.environment),
                     }),
                 );
                 Ok(())
@@ -256,14 +257,12 @@ impl Interpreter {
                     Function::Defined {
                         parameters,
                         code_block,
+                        closure,
                         ..
-                    } => self.eval_call(&parameters, &code_block, &args),
+                    } => self.eval_call(&parameters, &code_block, &args, closure),
                 }
             }
-            _ => Err(runtime_error(format!(
-                "'{}' is not callable",
-                callee_obj.format()
-            ))),
+            _ => Err(runtime_error(format!("'{}' is not callable", callee_obj))),
         }
     }
 
@@ -272,8 +271,9 @@ impl Interpreter {
         parameters: &[String],
         code_block: &Statement,
         args: &[LoxObject],
+        closure: EnvRef,
     ) -> Result<LoxObject, Interruption> {
-        let environment = Environment::new_local(Rc::clone(&self.globals));
+        let environment = Environment::new_local(Rc::clone(&closure));
         let old_environment = Rc::clone(&self.environment);
 
         self.environment = Rc::new(RefCell::new(environment));

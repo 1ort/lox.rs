@@ -1,4 +1,6 @@
-use crate::{ast::Statement, interruption::Interruption, object::LoxObject};
+use core::fmt;
+
+use crate::{ast::Statement, environment::EnvRef, interruption::Interruption, object::LoxObject};
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -11,6 +13,7 @@ pub enum Function {
         name: String,
         parameters: Vec<String>,
         code_block: Box<Statement>,
+        closure: EnvRef,
     },
 }
 
@@ -26,6 +29,16 @@ impl Function {
         match self {
             Function::Native { identifier, .. } => format!("function '{}'", identifier),
             Function::Defined { name, .. } => format!("function '{}'", name),
+        }
+    }
+}
+impl std::fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Function::Native { identifier, .. } => {
+                f.write_fmt(format_args!("function '{}'", identifier))
+            }
+            Function::Defined { name, .. } => f.write_fmt(format_args!("function '{}'", name)),
         }
     }
 }

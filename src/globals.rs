@@ -36,7 +36,7 @@ pub fn build_globals() -> Environment {
                 }
                 _ => Err(runtime_error(format!(
                     "Function 'sleep' expects number, but '{}' was provided.",
-                    duration.format()
+                    duration
                 ))),
             }
         },

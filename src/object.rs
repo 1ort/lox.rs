@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::function::Function;
 use crate::interruption::{Interruption, runtime_error};
 
@@ -71,6 +73,10 @@ impl LoxObject {
                 }
             }
             (Nil, Nil) => Ok(Boolean(true)),
+            (Function(_), Function(_)) => Err(runtime_error(
+                "Can not compare function objects".to_string(),
+            )),
+
             _ => Ok(Boolean(false)),
         }
     }
@@ -132,11 +138,16 @@ impl LoxObject {
     pub fn add(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a + b)),
-            (LoxObject::String(a), LoxObject::String(b)) => Ok(LoxObject::String(a.to_owned() + b)),
-            _ => Err(runtime_error(format!(
-                "Can not add {:?} + {:?}",
-                self, other
-            ))),
+            (LoxObject::String(a), LoxObject::String(b)) => {
+                Ok(LoxObject::String(format!("{}{}", a, b)))
+            }
+            (LoxObject::String(a), LoxObject::Number(b)) => {
+                Ok(LoxObject::String(format!("{}{}", a, b)))
+            }
+            (LoxObject::Number(a), LoxObject::String(b)) => {
+                Ok(LoxObject::String(format!("{}{}", a, b)))
+            }
+            _ => Err(runtime_error(format!("Can not add {:} + {:}", self, other))),
         }
     }
 
@@ -165,14 +176,16 @@ impl LoxObject {
             ))),
         }
     }
+}
 
-    pub fn format(&self) -> String {
+impl std::fmt::Display for LoxObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LoxObject::Number(val) => format!("{}", val),
-            LoxObject::String(val) => val.to_string(),
-            LoxObject::Boolean(val) => format!("{}", val),
-            LoxObject::Nil => "Nil".to_string(),
-            LoxObject::Function(function) => function.format(),
+            LoxObject::Number(val) => f.write_fmt(format_args!("{}", val)),
+            LoxObject::String(val) => f.write_fmt(format_args!("{}", val)),
+            LoxObject::Boolean(val) => f.write_fmt(format_args!("{}", val)),
+            LoxObject::Nil => f.write_str("nil"),
+            LoxObject::Function(function) => f.write_fmt(format_args!("{}", function)),
         }
     }
 }
