@@ -1,7 +1,8 @@
-#[derive(Debug, PartialEq)]
+use std::clone;
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Eof,
-
     // Single-character tokens.
     LeftParen,
     RightParen,
@@ -47,7 +48,7 @@ pub enum TokenType {
     Break,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,

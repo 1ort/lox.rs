@@ -28,10 +28,9 @@ impl Lox {
                             return None;
                         }
                     }
-                    Err(err) => {
-                        self.error(0, &err);
-
-                        return Some(Box::new(err));
+                    Err(error) => {
+                        self.report(&error);
+                        return Some(Box::new(error.to_string()));
                     }
                 }
             }

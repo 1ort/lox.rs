@@ -3,6 +3,7 @@ use crate::{
         BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement,
         UnaryOperator,
     },
+    interruption::{Interruption, parser_error},
     token::{Token, TokenType},
 };
 
@@ -12,10 +13,7 @@ struct Parser {
     is_inside_loop: bool, // break is possible
 }
 
-type ParserError = String;
-type ParserResult<T> = Result<T, ParserError>;
-
-pub fn parse_program(tokens: Vec<Token>) -> ParserResult<Program> {
+pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Interruption> {
     let mut parser = Parser::new(tokens);
     parser.program()
 }
@@ -29,7 +27,7 @@ impl Parser {
         }
     }
 
-    fn program(&mut self) -> ParserResult<Program> {
+    fn program(&mut self) -> Result<Program, Interruption> {
         let mut program = Program {
             statements: Vec::new(),
         };
@@ -40,7 +38,7 @@ impl Parser {
         }
         Ok(program)
     }
-    fn declaration(&mut self) -> ParserResult<Statement> {
+    fn declaration(&mut self) -> Result<Statement, Interruption> {
         match self.peek().token_type {
             TokenType::Fun => {
                 self.advance();
@@ -54,11 +52,14 @@ impl Parser {
         }
     }
 
-    fn fun_declaration(&mut self) -> ParserResult<Statement> {
+    fn fun_declaration(&mut self) -> Result<Statement, Interruption> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
-            return Err("Expected function name after 'fun'.".to_string());
+            return Err(parser_error(
+                self.peek().clone(),
+                "Expected function name after 'fun'.",
+            ));
         };
         self.advance();
         self.expect_token(TokenType::LeftParen, "Expected '(' after function name")?;
@@ -67,13 +68,19 @@ impl Parser {
         if !matches!(self.peek().token_type, TokenType::RightParen) {
             loop {
                 if parameters.len() >= 255 {
-                    return Err("Function can't have more than 255 params.".to_string());
+                    return Err(parser_error(
+                        self.peek().clone(),
+                        "Function can't have more than 255 params.",
+                    ));
                 }
 
                 let param = if let TokenType::Identifier(param) = &self.peek().token_type {
                     param.clone()
                 } else {
-                    return Err("Expected function parameter to be identifier.".to_string());
+                    return Err(parser_error(
+                        self.peek().clone(),
+                        "Expected function parameter to be identifier.",
+                    ));
                 };
                 parameters.push(param);
                 self.advance();
@@ -97,11 +104,11 @@ impl Parser {
         });
     }
 
-    fn var_declaration(&mut self) -> ParserResult<Statement> {
+    fn var_declaration(&mut self) -> Result<Statement, Interruption> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
-            return Err("Expected variable name.".to_string());
+            return Err(parser_error(self.peek().clone(), "Variable name expected."));
         };
 
         self.advance();
@@ -117,7 +124,7 @@ impl Parser {
         Ok(Statement::VarDeclaration { name, initializer })
     }
 
-    fn statement(&mut self) -> ParserResult<Statement> {
+    fn statement(&mut self) -> Result<Statement, Interruption> {
         match self.peek().token_type {
             TokenType::LeftBrace => {
                 self.advance();
@@ -140,19 +147,19 @@ impl Parser {
                 self.for_statement()
             }
             TokenType::Break => {
-                self.advance();
+                let tok = self.advance().clone();
                 self.expect_token(TokenType::Semicolon, "Expected ';' after 'break'.")?;
                 if self.is_inside_loop {
                     Ok(Statement::Break)
                 } else {
-                    Err("'break' outside of loop body.".to_string())
+                    Err(parser_error(tok, "'break' outside of loop body."))
                 }
             }
             _ => self.expression_statement(),
         }
     }
 
-    fn block_statement(&mut self) -> ParserResult<Statement> {
+    fn block_statement(&mut self) -> Result<Statement, Interruption> {
         let mut statements = Vec::new();
         loop {
             if matches!(self.peek().token_type, TokenType::RightBrace) || self.is_at_end() {
@@ -165,7 +172,7 @@ impl Parser {
         Ok(Statement::Block { statements })
     }
 
-    fn print_statement(&mut self) -> ParserResult<Statement> {
+    fn print_statement(&mut self) -> Result<Statement, Interruption> {
         let expr = self.expression()?;
         self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
         Ok(Statement::Print {
@@ -173,7 +180,7 @@ impl Parser {
         })
     }
 
-    fn if_statement(&mut self) -> ParserResult<Statement> {
+    fn if_statement(&mut self) -> Result<Statement, Interruption> {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'if'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after if condition.")?;
@@ -193,7 +200,7 @@ impl Parser {
         })
     }
 
-    fn while_statement(&mut self) -> ParserResult<Statement> {
+    fn while_statement(&mut self) -> Result<Statement, Interruption> {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'while'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after loop condition.")?;
@@ -204,7 +211,7 @@ impl Parser {
         Ok(Statement::WhileLoop { condition, body })
     }
 
-    fn for_statement(&mut self) -> ParserResult<Statement> {
+    fn for_statement(&mut self) -> Result<Statement, Interruption> {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'for'.")?;
         let maybe_initializer = match self.peek().token_type {
             TokenType::Semicolon => {
@@ -264,7 +271,7 @@ impl Parser {
         Ok(statement)
     }
 
-    fn expression_statement(&mut self) -> ParserResult<Statement> {
+    fn expression_statement(&mut self) -> Result<Statement, Interruption> {
         let expr = self.expression()?;
 
         self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
@@ -273,24 +280,24 @@ impl Parser {
         })
     }
 
-    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> ParserResult<()> {
+    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> Result<(), Interruption> {
         if self.peek().token_type == expected {
             self.advance();
             Ok(())
         } else {
-            Err(error_msg.to_string())
+            Err(parser_error(self.peek().clone(), error_msg))
         }
     }
 
-    fn expression(&mut self) -> ParserResult<Expression> {
+    fn expression(&mut self) -> Result<Expression, Interruption> {
         self.assignment()
     }
 
-    fn assignment(&mut self) -> ParserResult<Expression> {
+    fn assignment(&mut self) -> Result<Expression, Interruption> {
         let expr = self.or()?;
 
         if let TokenType::Equal = self.peek().token_type {
-            self.advance();
+            let tok = self.advance();
             match expr {
                 Expression::Identifier { name } => {
                     let value = self.assignment()?;
@@ -299,14 +306,14 @@ impl Parser {
                         expression: Box::new(value),
                     });
                 }
-                _ => return Err("Invalid assignment target.".to_string()),
+                _ => return Err(parser_error(tok.clone(), "Invalid assignment target.")),
             }
         }
 
         Ok(expr)
     }
 
-    fn or(&mut self) -> ParserResult<Expression> {
+    fn or(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.and()?;
 
         loop {
@@ -325,7 +332,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn and(&mut self) -> ParserResult<Expression> {
+    fn and(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.equality()?;
 
         loop {
@@ -344,7 +351,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn equality(&mut self) -> ParserResult<Expression> {
+    fn equality(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.comparison()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -363,7 +370,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> ParserResult<Expression> {
+    fn comparison(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.term()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -384,7 +391,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&mut self) -> ParserResult<Expression> {
+    fn term(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.factor()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -403,7 +410,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> ParserResult<Expression> {
+    fn factor(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.unary()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -422,7 +429,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> ParserResult<Expression> {
+    fn unary(&mut self) -> Result<Expression, Interruption> {
         let unary_operator = match self.peek().token_type {
             TokenType::Bang => UnaryOperator::Bang,
             TokenType::Minus => UnaryOperator::Minus,
@@ -436,7 +443,7 @@ impl Parser {
         })
     }
 
-    fn call(&mut self) -> ParserResult<Expression> {
+    fn call(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.primary()?;
 
         loop {
@@ -453,12 +460,15 @@ impl Parser {
         Ok(expr)
     }
 
-    fn finish_call(&mut self, callee: Box<Expression>) -> ParserResult<Expression> {
+    fn finish_call(&mut self, callee: Box<Expression>) -> Result<Expression, Interruption> {
         let mut args = Vec::new();
         if !matches!(self.peek().token_type, TokenType::RightParen) {
             loop {
                 if args.len() >= 255 {
-                    return Err("Can't have more than 255 arguments.".to_string());
+                    return Err(parser_error(
+                        self.peek().clone(),
+                        "Can't have more than 255 arguments.",
+                    ));
                 }
                 args.push(self.expression()?);
 
@@ -477,7 +487,7 @@ impl Parser {
         });
     }
 
-    fn primary(&mut self) -> ParserResult<Expression> {
+    fn primary(&mut self) -> Result<Expression, Interruption> {
         use Expression::{Identifier, Literal};
         use LiteralValue::*;
         let expression = match &self.peek().token_type {
@@ -501,7 +511,7 @@ impl Parser {
         Ok(expression)
     }
 
-    fn grouping(&mut self) -> ParserResult<Expression> {
+    fn grouping(&mut self) -> Result<Expression, Interruption> {
         if matches!(self.peek().token_type, TokenType::LeftParen) {
             self.advance();
             let expr = self.expression()?;
@@ -511,17 +521,17 @@ impl Parser {
                     expression: Box::new(expr),
                 })
             } else {
-                Err(format!("Expected: ')', got: {}", self.peek().lexeme))
+                Err(parser_error(self.peek().clone(), "Expected ')'"))
             }
         } else {
             self.fallback()
         }
     }
 
-    fn fallback(&mut self) -> ParserResult<Expression> {
+    fn fallback(&mut self) -> Result<Expression, Interruption> {
         match self.peek().token_type {
-            TokenType::Eof => Err("Unexpected EOF".to_string()),
-            _ => Err(format!("Unexpected token: {}", self.peek().lexeme)),
+            TokenType::Eof => Err(parser_error(self.peek().clone(), "Unexpected EOF")),
+            _ => Err(parser_error(self.peek().clone(), "Unexpected token")),
         }
     }
 

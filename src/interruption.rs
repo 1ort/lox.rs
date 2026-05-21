@@ -53,8 +53,11 @@ pub fn lexer_error(lexeme: String, line: usize, message: String) -> Interruption
     }
 }
 
-pub fn parser_error(token: Token, message: String) -> Interruption {
-    Interruption::ParserError { token, message }
+pub fn parser_error(token: Token, message: &str) -> Interruption {
+    Interruption::ParserError {
+        token,
+        message: message.to_string(),
+    }
 }
 
 pub fn runtime_error(message: String) -> Interruption {
