@@ -4,18 +4,20 @@ use std::str::Chars;
 use crate::interruption::{Interruption, lexer_error};
 use crate::token::{Token, TokenType};
 
-type Source<'s> = Peekable<Chars<'s>>;
+type Source<'a> = Peekable<Chars<'a>>;
 
-struct Lexer<'s> {
-    source: Source<'s>,
+struct Lexer<'a> {
+    source: Source<'a>,
     current_line: usize,
+    current_position: usize,
 }
 
 pub fn scan_tokens(source: String) -> Result<Vec<Token>, Interruption> {
     let mut tokens = Vec::new();
     let mut lexer = Lexer {
         source: source.chars().peekable(),
-        current_line: 0,
+        current_line: 1,
+        current_position: 1,
     };
 
     while let Some(token) = lexer.lex()? {
@@ -32,16 +34,13 @@ pub fn scan_tokens(source: String) -> Result<Vec<Token>, Interruption> {
 
 impl<'a> Lexer<'a> {
     fn lex(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
-        let c = self.source.peek();
+        let c = self.peek();
         if c.is_none() {
             return Ok(None);
         }
         let c = c.unwrap();
 
         if c.is_whitespace() {
-            if c == &'\n' {
-                self.current_line += 1;
-            }
             self.skip_spaces();
             self.lex()
         } else if c.is_ascii_digit() {
@@ -57,8 +56,8 @@ impl<'a> Lexer<'a> {
 
     fn lex_number(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
         let mut buff = self.take_till(|c| c.is_ascii_digit());
-        if self.source.peek() == Some(&'.') {
-            buff.push(self.source.next().unwrap());
+        if self.peek() == Some(&'.') {
+            buff.push(self.next().unwrap());
             let fract = self.take_till(|c| c.is_ascii_digit());
             if fract.is_empty() {
                 return Err(lexer_error(
@@ -78,10 +77,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_string(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
-        self.source.next().unwrap();
+        self.next().unwrap();
         let content = self.take_till(|c| c.ne(&'"'));
 
-        if let Some('"') = self.source.next() {
+        if let Some('"') = self.next() {
             Ok(Token {
                 token_type: TokenType::String(content.clone()),
                 lexeme: format!("\"{content}\""),
@@ -126,7 +125,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_symbol(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
-        let c = self.source.next().unwrap();
+        let c = self.next().unwrap();
 
         let token_type = match c {
             '(' => TokenType::LeftParen,
@@ -193,12 +192,12 @@ impl<'a> Lexer<'a> {
 
     fn take_till(self: &mut Lexer<'a>, till: impl Fn(char) -> bool) -> String {
         let mut buff = String::new();
-        while let Some(c) = self.source.peek() {
+        while let Some(c) = self.peek() {
             if !till(*c) {
                 break;
             }
             buff.push(*c);
-            self.source.next();
+            self.next();
         }
         buff
     }
@@ -208,18 +207,35 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_till(self: &mut Lexer<'a>, till: impl Fn(char) -> bool) {
-        while let Some(c) = self.source.peek() {
+        while let Some(c) = self.peek() {
             if !till(*c) {
                 break;
             }
-            self.source.next();
+            if c == &'\n' {
+                self.current_line += 1;
+                self.current_position = 1;
+            }
+            self.next();
         }
     }
 
+    fn next(&mut self) -> Option<char> {
+        if let Some(ch) = self.source.next() {
+            self.current_position += 1;
+            Some(ch)
+        } else {
+            None
+        }
+    }
+
+    fn peek(&mut self) -> Option<&char> {
+        self.source.peek()
+    }
+
     fn match_next(self: &mut Lexer<'a>, expected: char) -> bool {
-        if let Some(next) = self.source.peek() {
+        if let Some(next) = self.peek() {
             if *next == expected {
-                self.source.next();
+                self.next();
                 return true;
             }
             return false;

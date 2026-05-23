@@ -1,3 +1,6 @@
+use core::slice::Iter;
+use std::iter::Peekable;
+
 use crate::{
     ast::{
         BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement,
@@ -7,23 +10,24 @@ use crate::{
     token::{Token, TokenType},
 };
 
-struct Parser {
-    tokens: Vec<Token>,
-    current: usize,
-    is_inside_loop: bool,          // break is possible
-    is_inside_function_body: bool, // return is possible
+type TokensPeekable<'a> = Peekable<Iter<'a, Token>>;
+
+struct Parser<'a> {
+    tokens: TokensPeekable<'a>,
+    is_inside_loop: bool,
+    is_inside_function_body: bool,
 }
 
 pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Interruption> {
-    let mut parser = Parser::new(tokens);
+    let tokens_it = tokens.iter().peekable();
+    let mut parser = Parser::new(tokens_it);
     parser.program()
 }
 
-impl Parser {
-    fn new(tokens: Vec<Token>) -> Self {
+impl<'a> Parser<'a> {
+    fn new(tokens: TokensPeekable<'a>) -> Parser<'a> {
         Parser {
             tokens,
-            current: 0,
             is_inside_loop: false,
             is_inside_function_body: false,
         }
@@ -563,14 +567,12 @@ impl Parser {
         }
     }
 
-    fn peek(&self) -> &Token {
-        &self.tokens[self.current]
+    fn peek(&mut self) -> &Token {
+        self.tokens.peek().unwrap()
     }
 
     fn advance(&mut self) -> &Token {
-        let token = &self.tokens[self.current];
-        self.current += 1;
-        token
+        self.tokens.next().unwrap()
     }
 
     fn is_at_end(&mut self) -> bool {
