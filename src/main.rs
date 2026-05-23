@@ -32,7 +32,7 @@ fn main() {
 
 fn run_file(lox: &mut Lox, filename: String) {
     let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
-    let err = lox.run(contents);
+    let err = lox.run(&contents);
     if err.is_some() {
         process::exit(65);
     }
@@ -47,6 +47,6 @@ fn run_prompt(lox: &mut Lox) {
         if line.trim_end().is_empty() {
             break;
         }
-        lox.run(line);
+        lox.run(line.trim_end());
     }
 }

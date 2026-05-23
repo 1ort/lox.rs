@@ -12,7 +12,7 @@ struct Lexer<'a> {
     current_position: usize,
 }
 
-pub fn scan_tokens(source: String) -> Result<Vec<Token>, Interruption> {
+pub fn scan_tokens(source: &str) -> Result<Vec<Token>, Interruption> {
     let mut tokens = Vec::new();
     let mut lexer = Lexer {
         source: source.chars().peekable(),
@@ -27,6 +27,7 @@ pub fn scan_tokens(source: String) -> Result<Vec<Token>, Interruption> {
         token_type: TokenType::Eof,
         lexeme: "".to_string(),
         line: lexer.current_line,
+        position: lexer.current_position,
     });
 
     Ok(tokens)
@@ -63,6 +64,7 @@ impl<'a> Lexer<'a> {
                 return Err(lexer_error(
                     buff,
                     self.current_line,
+                    self.current_position,
                     "Invalid number. Fractional part expected.".to_string(),
                 ));
             }
@@ -73,6 +75,7 @@ impl<'a> Lexer<'a> {
             token_type: TokenType::Number(buff.parse().unwrap()),
             lexeme: buff,
             line: self.current_line,
+            position: self.current_position,
         })
     }
 
@@ -85,11 +88,13 @@ impl<'a> Lexer<'a> {
                 token_type: TokenType::String(content.clone()),
                 lexeme: format!("\"{content}\""),
                 line: self.current_line,
+                position: self.current_position,
             })
         } else {
             Err(lexer_error(
                 format!("\"{content}"),
                 self.current_line,
+                self.current_position,
                 "Unterminated string.".to_string(),
             ))
         }
@@ -121,6 +126,7 @@ impl<'a> Lexer<'a> {
             },
             lexeme: buff,
             line: self.current_line,
+            position: self.current_position,
         }
     }
 
@@ -178,6 +184,7 @@ impl<'a> Lexer<'a> {
                 return Err(lexer_error(
                     c.to_string(),
                     self.current_line,
+                    self.current_position,
                     "Unexpected token".to_string(),
                 ));
             }
@@ -187,6 +194,7 @@ impl<'a> Lexer<'a> {
             token_type,
             lexeme: c.to_string(),
             line: self.current_line,
+            position: self.current_position,
         }))
     }
 

@@ -13,7 +13,7 @@ impl Lox {
         }
     }
 
-    pub fn run(&mut self, source: String) -> Option<Box<Interruption>> {
+    pub fn run(&mut self, source: &str) -> Option<Box<Interruption>> {
         let tokens = scanner::scan_tokens(source);
         match tokens {
             Ok(tokens) => {
