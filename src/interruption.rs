@@ -16,6 +16,9 @@ pub enum Interruption {
         token: Token,
         message: String,
     },
+    ResolverError {
+        message: String,
+    },
     RuntimeError {
         message: String,
     },
@@ -41,6 +44,9 @@ impl Display for Interruption {
                 "[{}:{}] Parser error. \"{}\": {}",
                 token.line, token.position, token.lexeme, message
             )),
+            Interruption::ResolverError { message } => {
+                f.write_fmt(format_args!("Resolver error. {}", message))
+            }
             Interruption::RuntimeError { message } => {
                 f.write_fmt(format_args!("Runtime error. {}", message))
             }
@@ -66,6 +72,10 @@ pub fn parser_error(token: Token, message: &str) -> Interruption {
         token,
         message: message.to_string(),
     }
+}
+
+pub fn resolver_error(message: String) -> Interruption {
+    Interruption::ResolverError { message }
 }
 
 pub fn runtime_error(message: String) -> Interruption {

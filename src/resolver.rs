@@ -1,0 +1,223 @@
+use std::collections::HashMap;
+
+use crate::{
+    ast::{Expression, Program, Statement},
+    interruption::{Interruption, resolver_error},
+};
+
+#[derive(Clone)]
+enum DeclarationState {
+    Declared,
+    Defined,
+}
+
+pub struct Resolver {
+    scopes: Vec<HashMap<String, DeclarationState>>,
+}
+
+impl Resolver {
+    pub fn new() -> Resolver {
+        Resolver { scopes: Vec::new() }
+    }
+
+    fn begin_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    fn end_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    fn declare(&mut self, name: &str) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.to_string(), DeclarationState::Declared);
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn define(&mut self, name: &str) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.to_string(), DeclarationState::Defined);
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn get_state_in_current_scope(&self, name: &str) -> Option<DeclarationState> {
+        if let Some(scope) = self.scopes.last() {
+            scope.get(&name.to_string()).cloned()
+        } else {
+            None
+        }
+    }
+
+    fn resolve_local(&mut self, expr: &Expression, name: &str) {
+        if let Some(depth) = self
+            .scopes
+            .iter()
+            .rev()
+            .position(|scope| scope.contains_key(name))
+        {
+            self.resolve_expression_depth(expr, depth);
+        }
+    }
+
+    fn resolve_expression_depth(&mut self, expr: &Expression, depth: usize) {
+        todo!()
+    }
+
+    pub fn resolve_program(&mut self, program: &Program) -> Result<(), Interruption> {
+        self.begin_scope();
+        let mut iterator = program.statements.iter();
+
+        for result in iterator.by_ref().map(|stmt| self.resolve_statement(stmt)) {
+            if result.is_err() {
+                return result.map(|_| ());
+            }
+        }
+        Ok(())
+    }
+
+    fn resolve_statement(&mut self, stmt: &Statement) -> Result<(), Interruption> {
+        match stmt {
+            Statement::Block { statements } => self.resolve_block_stmt(statements),
+            Statement::VarDeclaration { name, initializer } => {
+                self.resolve_var_declaration(name, initializer)
+            }
+            Statement::FunctionDeclaration {
+                name,
+                parameters,
+                body,
+            } => self.resolve_function_statement(name, parameters, body),
+            Statement::Expression { expression } => self.resolve_expression(expression),
+            Statement::Print { expression } => self.resolve_expression(expression),
+            Statement::Conditional {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.resolve_expression(condition)?;
+                self.resolve_statement(then_branch)?;
+                if let Some(stmt) = else_branch {
+                    self.resolve_statement(stmt)?;
+                }
+                Ok(())
+            }
+            Statement::WhileLoop { condition, body } => {
+                self.resolve_expression(condition)?;
+                self.resolve_statement(body)
+            }
+            Statement::Return { expresstion } => {
+                if let Some(expr) = expresstion {
+                    self.resolve_expression(expr)
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn resolve_block_stmt(&mut self, statements: &Vec<Statement>) -> Result<(), Interruption> {
+        self.begin_scope();
+        let result = statements
+            .iter()
+            .try_for_each(|stmt| self.resolve_statement(stmt));
+        self.end_scope();
+        result
+    }
+
+    fn resolve_function_statement(
+        &mut self,
+        name: &str,
+        parameters: &Vec<String>,
+        body: &Statement,
+    ) -> Result<(), Interruption> {
+        self.declare(name);
+        self.define(name);
+        self.resolve_function(parameters, body)?;
+        Ok(())
+    }
+
+    fn resolve_function(
+        &mut self,
+        parameters: &Vec<String>,
+        body: &Statement,
+    ) -> Result<(), Interruption> {
+        self.begin_scope();
+        for param in parameters {
+            self.define(param);
+            self.declare(param);
+        }
+        self.resolve_statement(body)?;
+        self.end_scope();
+        Ok(())
+    }
+
+    fn resolve_var_declaration(
+        &mut self,
+        name: &str,
+        initializer: &Option<Box<Expression>>,
+    ) -> Result<(), Interruption> {
+        self.declare(name);
+        if let Some(expr) = initializer {
+            self.resolve_expression(expr)?;
+        }
+        self.define(name);
+        Ok(())
+    }
+
+    fn resolve_expression(&mut self, expression: &Expression) -> Result<(), Interruption> {
+        match expression {
+            Expression::Identifier { name } => self.resolve_identifier_expression(expression),
+            Expression::Assignment { name, expression } => {
+                self.resolve_assignment_expression(expression)
+            }
+            Expression::Unary { expression, .. } => self.resolve_expression(expression),
+            Expression::Binary { left, right, .. } => {
+                self.resolve_expression(left)?;
+                self.resolve_expression(right)
+            }
+            Expression::Logical { left, right, .. } => {
+                self.resolve_expression(left)?;
+                self.resolve_expression(right)
+            }
+            Expression::Grouping { expression } => self.resolve_expression(expression),
+            Expression::Call { callee, arguments } => {
+                self.resolve_expression(callee)?;
+                arguments
+                    .iter()
+                    .try_for_each(|expr| self.resolve_expression(expr))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn resolve_identifier_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
+        let Expression::Identifier { name } = expr else {
+            unreachable!()
+        };
+
+        if matches!(
+            self.get_state_in_current_scope(name),
+            Some(DeclarationState::Declared)
+        ) {
+            return Err(resolver_error(format!(
+                "Can't read local variable in its own initializer: '{}'.",
+                name
+            )));
+        }
+
+        self.resolve_local(expr, name);
+        Ok(())
+    }
+    fn resolve_assignment_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
+        let Expression::Assignment { name, expression } = expr else {
+            unreachable!()
+        };
+        self.resolve_expression(expression)?;
+        self.resolve_local(expr, name);
+        Ok(())
+    }
+}

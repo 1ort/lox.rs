@@ -13,6 +13,7 @@ mod interpreter;
 mod interruption;
 mod object;
 mod parser;
+mod resolver;
 mod runner;
 mod scanner;
 mod token;
