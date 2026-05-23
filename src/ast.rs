@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -45,10 +47,12 @@ pub enum Expression {
     },
     Identifier {
         name: String,
+        resolved_scope_depth: RefCell<Option<usize>>,
     },
     Assignment {
         name: String,
         expression: Box<Expression>,
+        resolved_scope_depth: RefCell<Option<usize>>,
     },
     Unary {
         operator: UnaryOperator,

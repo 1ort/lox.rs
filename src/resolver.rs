@@ -59,12 +59,25 @@ impl Resolver {
             .rev()
             .position(|scope| scope.contains_key(name))
         {
-            self.resolve_expression_depth(expr, depth);
+            self.fill_expression_depth(expr, depth);
         }
     }
 
-    fn resolve_expression_depth(&mut self, expr: &Expression, depth: usize) {
-        todo!()
+    fn fill_expression_depth(&mut self, expr: &Expression, depth: usize) {
+        match expr {
+            Expression::Identifier {
+                resolved_scope_depth,
+                ..
+            }
+            | Expression::Assignment {
+                resolved_scope_depth,
+                ..
+            } => {
+                let mut expr_value = resolved_scope_depth.borrow_mut();
+                *expr_value = Some(depth);
+            }
+            _ => (),
+        }
     }
 
     pub fn resolve_program(&mut self, program: &Program) -> Result<(), Interruption> {
@@ -170,8 +183,8 @@ impl Resolver {
 
     fn resolve_expression(&mut self, expression: &Expression) -> Result<(), Interruption> {
         match expression {
-            Expression::Identifier { name } => self.resolve_identifier_expression(expression),
-            Expression::Assignment { name, expression } => {
+            Expression::Identifier { .. } => self.resolve_identifier_expression(expression),
+            Expression::Assignment { expression, .. } => {
                 self.resolve_assignment_expression(expression)
             }
             Expression::Unary { expression, .. } => self.resolve_expression(expression),
@@ -195,7 +208,7 @@ impl Resolver {
     }
 
     fn resolve_identifier_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
-        let Expression::Identifier { name } = expr else {
+        let Expression::Identifier { name, .. } = expr else {
             unreachable!()
         };
 
@@ -213,7 +226,10 @@ impl Resolver {
         Ok(())
     }
     fn resolve_assignment_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
-        let Expression::Assignment { name, expression } = expr else {
+        let Expression::Assignment {
+            name, expression, ..
+        } = expr
+        else {
             unreachable!()
         };
         self.resolve_expression(expression)?;
