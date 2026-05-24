@@ -184,9 +184,7 @@ impl Resolver {
     fn resolve_expression(&mut self, expression: &Expression) -> Result<(), Interruption> {
         match expression {
             Expression::Identifier { .. } => self.resolve_identifier_expression(expression),
-            Expression::Assignment { expression, .. } => {
-                self.resolve_assignment_expression(expression)
-            }
+            Expression::Assignment { .. } => self.resolve_assignment_expression(expression),
             Expression::Unary { expression, .. } => self.resolve_expression(expression),
             Expression::Binary { left, right, .. } => {
                 self.resolve_expression(left)?;

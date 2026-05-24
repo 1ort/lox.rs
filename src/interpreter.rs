@@ -138,8 +138,15 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_binary(left, operator, right),
-            Expression::Identifier { name } => self.eval_variable(name),
-            Expression::Assignment { name, expression } => self.eval_assignment(name, expression),
+            Expression::Identifier {
+                name,
+                resolved_scope_depth,
+            } => self.eval_variable(name, &resolved_scope_depth.borrow()),
+            Expression::Assignment {
+                name,
+                expression,
+                resolved_scope_depth,
+            } => self.eval_assignment(name, expression, &resolved_scope_depth.borrow()),
             Expression::Logical {
                 left,
                 operator,
@@ -149,8 +156,16 @@ impl Interpreter {
         }
     }
 
-    fn eval_variable(&mut self, name: &String) -> Result<LoxObject, Interruption> {
-        let obj_ref = self.environment.borrow().get(name)?;
+    fn eval_variable(
+        &mut self,
+        name: &String,
+        scope_depth: &Option<usize>,
+    ) -> Result<LoxObject, Interruption> {
+        let obj_ref = if let Some(distance) = *scope_depth {
+            self.environment.borrow().get_at(distance, name)?
+        } else {
+            self.globals.borrow().get(name)?
+        };
         Ok(obj_ref.clone())
     }
 
@@ -158,9 +173,16 @@ impl Interpreter {
         &mut self,
         name: &String,
         expression: &Expression,
+        scope_depth: &Option<usize>,
     ) -> Result<LoxObject, Interruption> {
         let value = self.eval_expression(expression)?;
-        self.environment.borrow_mut().assign(name, value.clone())?;
+        if let Some(distance) = *scope_depth {
+            self.environment
+                .borrow_mut()
+                .assign_at(distance, name, value.clone())?;
+        } else {
+            self.globals.borrow_mut().assign(name, value.clone())?
+        }
         Ok(value)
     }
 

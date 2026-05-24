@@ -1,5 +1,8 @@
 use core::slice::Iter;
-use std::iter::Peekable;
+use std::{
+    cell::{Ref, RefCell},
+    iter::Peekable,
+};
 
 use crate::{
     ast::{
@@ -338,11 +341,12 @@ impl<'a> Parser<'a> {
         if let TokenType::Equal = self.peek().token_type {
             let tok = self.advance();
             match expr {
-                Expression::Identifier { name } => {
+                Expression::Identifier { name, .. } => {
                     let value = self.assignment()?;
                     return Ok(Expression::Assignment {
                         name: name.clone(),
                         expression: Box::new(value),
+                        resolved_scope_depth: RefCell::new(None),
                     });
                 }
                 _ => return Err(parser_error(tok.clone(), "Invalid assignment target.")),
@@ -536,7 +540,10 @@ impl<'a> Parser<'a> {
             TokenType::String(string) => Literal {
                 value: String(string.clone()),
             },
-            TokenType::Identifier(name) => Identifier { name: name.clone() },
+            TokenType::Identifier(name) => Identifier {
+                name: name.clone(),
+                resolved_scope_depth: RefCell::new(None),
+            },
             _ => return self.grouping(),
         };
         self.advance();
