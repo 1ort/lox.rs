@@ -36,11 +36,7 @@ impl Environment {
         if let Some(value) = self.values.get(name) {
             Ok(value.clone())
         } else {
-            if let Some(ref enclosing) = self.enclosing {
-                enclosing.borrow().get(name)
-            } else {
-                Err(runtime_error(format!("Undefined variable: {} .", name)))
-            }
+            Err(runtime_error(format!("Undefined variable: {} .", name)))
         }
     }
 
@@ -61,11 +57,7 @@ impl Environment {
             self.values.insert(name.clone(), value);
             Ok(())
         } else {
-            if let Some(ref enclosing) = self.enclosing {
-                enclosing.borrow_mut().assign(name, value)
-            } else {
-                Err(runtime_error(format!("Undefined variable: {} .", name)))
-            }
+            Err(runtime_error(format!("Undefined variable: {} .", name)))
         }
     }
 
