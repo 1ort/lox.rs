@@ -5,19 +5,29 @@ use crate::{
     interruption::{Interruption, resolver_error},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum DeclarationState {
     Declared,
     Defined,
 }
 
+#[derive(Clone, Copy)]
+enum FunctionType {
+    None,
+    Function,
+}
+
 pub struct Resolver {
     scopes: Vec<HashMap<String, DeclarationState>>,
+    current_function_type: FunctionType,
 }
 
 impl Resolver {
     pub fn new() -> Resolver {
-        Resolver { scopes: Vec::new() }
+        Resolver {
+            scopes: Vec::new(),
+            current_function_type: FunctionType::None,
+        }
     }
 
     fn begin_scope(&mut self) {
@@ -28,9 +38,16 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &str) {
+    fn declare(&mut self, name: &str) -> Result<(), Interruption> {
+        if matches!(self.get_state_in_current_scope(name), Some(..)) {
+            return Err(resolver_error(format!(
+                "Already a variable with this name in this scope: {}",
+                name
+            )));
+        }
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.to_string(), DeclarationState::Declared);
+            Ok(())
         } else {
             unreachable!()
         }
@@ -122,7 +139,11 @@ impl Resolver {
                 self.resolve_statement(body)
             }
             Statement::Return { expresstion } => {
-                if let Some(expr) = expresstion {
+                if matches!(self.current_function_type, FunctionType::None) {
+                    Err(resolver_error(
+                        "Can't return from top-level code.".to_string(),
+                    ))
+                } else if let Some(expr) = expresstion {
                     self.resolve_expression(expr)
                 } else {
                     Ok(())
@@ -132,7 +153,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_block_stmt(&mut self, statements: &Vec<Statement>) -> Result<(), Interruption> {
+    fn resolve_block_stmt(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
         self.begin_scope();
         let result = statements
             .iter()
@@ -147,9 +168,9 @@ impl Resolver {
         parameters: &Vec<String>,
         body: &Statement,
     ) -> Result<(), Interruption> {
-        self.declare(name);
+        self.declare(name)?;
         self.define(name);
-        self.resolve_function(parameters, body)?;
+        self.resolve_function(parameters, body, FunctionType::Function)?;
         Ok(())
     }
 
@@ -157,14 +178,20 @@ impl Resolver {
         &mut self,
         parameters: &Vec<String>,
         body: &Statement,
+        function_type: FunctionType,
     ) -> Result<(), Interruption> {
+        let enclosing_function_type = self.current_function_type;
+        self.current_function_type = function_type;
+
         self.begin_scope();
         for param in parameters {
+            self.declare(param)?;
             self.define(param);
-            self.declare(param);
         }
         self.resolve_statement(body)?;
         self.end_scope();
+
+        self.current_function_type = enclosing_function_type;
         Ok(())
     }
 
@@ -173,7 +200,7 @@ impl Resolver {
         name: &str,
         initializer: &Option<Box<Expression>>,
     ) -> Result<(), Interruption> {
-        self.declare(name);
+        self.declare(name)?;
         if let Some(expr) = initializer {
             self.resolve_expression(expr)?;
         }
