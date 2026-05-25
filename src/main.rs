@@ -6,6 +6,7 @@ use std::io::Write;
 use std::process;
 
 mod ast;
+mod class;
 mod environment;
 mod function;
 mod globals;

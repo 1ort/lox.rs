@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{Expression, Program, Statement},
+    ast::{Expression, FunctionStatement, Program, Statement},
     interruption::{Interruption, resolver_error},
+    object,
 };
 
 #[derive(Clone, Copy)]
@@ -15,6 +16,7 @@ enum DeclarationState {
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver {
@@ -115,11 +117,15 @@ impl Resolver {
             Statement::VarDeclaration { name, initializer } => {
                 self.resolve_var_declaration(name, initializer)
             }
-            Statement::FunctionDeclaration {
+            Statement::FunctionDeclaration(FunctionStatement {
                 name,
                 parameters,
                 body,
-            } => self.resolve_function_statement(name, parameters, body),
+            }) => {
+                self.declare(name)?;
+                self.define(name);
+                self.resolve_function(parameters, body, FunctionType::Function)
+            }
             Statement::Expression { expression } => self.resolve_expression(expression),
             Statement::Print { expression } => self.resolve_expression(expression),
             Statement::Conditional {
@@ -149,7 +155,17 @@ impl Resolver {
                     Ok(())
                 }
             }
-            _ => Ok(()),
+            Statement::Break => Ok(()),
+            Statement::ClassDeclaration { name, methods } => {
+                self.declare(name)?;
+                self.define(name);
+                methods.iter().try_for_each(|fun_stmt| {
+                    let FunctionStatement {
+                        parameters, body, ..
+                    } = fun_stmt;
+                    self.resolve_function(parameters, body, FunctionType::Method)
+                })
+            }
         }
     }
 
@@ -160,18 +176,6 @@ impl Resolver {
             .try_for_each(|stmt| self.resolve_statement(stmt));
         self.end_scope();
         result
-    }
-
-    fn resolve_function_statement(
-        &mut self,
-        name: &str,
-        parameters: &Vec<String>,
-        body: &Statement,
-    ) -> Result<(), Interruption> {
-        self.declare(name)?;
-        self.define(name);
-        self.resolve_function(parameters, body, FunctionType::Function)?;
-        Ok(())
     }
 
     fn resolve_function(
@@ -228,7 +232,14 @@ impl Resolver {
                     .iter()
                     .try_for_each(|expr| self.resolve_expression(expr))
             }
-            _ => Ok(()),
+            Expression::Literal { .. } => Ok(()),
+            Expression::Get { object, .. } => self.resolve_expression(object),
+            Expression::Set {
+                object, expression, ..
+            } => {
+                self.resolve_expression(object)?;
+                self.resolve_expression(expression)
+            }
         }
     }
 

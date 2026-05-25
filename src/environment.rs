@@ -52,9 +52,9 @@ impl Environment {
         }
     }
 
-    pub fn assign(&mut self, name: &String, value: ObjRef) -> Result<(), Interruption> {
-        if self.values.contains_key(name) {
-            self.values.insert(name.clone(), value);
+    pub fn assign(&mut self, name: String, value: ObjRef) -> Result<(), Interruption> {
+        if self.values.contains_key(&name) {
+            self.values.insert(name, value);
             Ok(())
         } else {
             Err(runtime_error(format!("Undefined variable: {} .", name)))

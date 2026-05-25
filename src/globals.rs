@@ -3,6 +3,7 @@ use crate::function::Function;
 use crate::interruption::runtime_error;
 use crate::object::{LoxObject, objref};
 
+use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn build_globals() -> Environment {
     let mut globals = Environment::new_global();
 
-    let clock = LoxObject::Function(Function::Native {
+    let clock = LoxObject::Function(Rc::new(Function::Native {
         identifier: "clock".to_string(),
         arity: 0,
         callable: |_| {
@@ -21,10 +22,10 @@ pub fn build_globals() -> Environment {
                 .as_millis() as f64;
             Ok(objref(LoxObject::Number(millis)))
         },
-    });
+    }));
     globals.define("clock".to_string(), objref(clock));
 
-    let sleep = LoxObject::Function(Function::Native {
+    let sleep = LoxObject::Function(Rc::new(Function::Native {
         identifier: "sleep".to_string(),
         arity: 1,
         callable: |args| {
@@ -41,7 +42,7 @@ pub fn build_globals() -> Environment {
             }
             .map(objref)
         },
-    });
+    }));
 
     globals.define("sleep".to_string(), objref(sleep));
     globals.define(

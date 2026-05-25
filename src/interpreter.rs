@@ -2,12 +2,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ast::{
-    BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement, UnaryOperator,
+    BinaryOperator, Expression, FunctionStatement, LiteralValue, LogicalOperator, Program,
+    Statement, UnaryOperator,
 };
+use crate::class::{Class, Instance};
 use crate::environment::{EnvRef, Environment};
 use crate::function::Function;
 use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
-use crate::object::{LoxObject, ObjRef, objref};
+use crate::object::{self, LoxObject, ObjRef, objref};
 
 use crate::globals;
 
@@ -86,21 +88,12 @@ impl Interpreter {
                 Ok(())
             }
             Statement::Break => Err(brake_inter()),
-            Statement::FunctionDeclaration {
-                name,
-                parameters,
-                body,
-            } => {
-                let func = LoxObject::Function(crate::function::Function::Defined {
-                    name: name.clone(),
-                    parameters: parameters.clone(),
-                    code_block: body.clone(),
-                    closure: Rc::clone(&self.environment),
-                });
+            Statement::FunctionDeclaration(func_stmt) => {
+                let func = self.eval_function_statement(func_stmt);
 
                 self.environment
                     .borrow_mut()
-                    .define(name.clone(), objref(func));
+                    .define(func.name(), objref(LoxObject::Function(func)));
                 Ok(())
             }
             Statement::Return { expresstion } => {
@@ -110,7 +103,40 @@ impl Interpreter {
                 };
                 Err(retun_inter(expr_result))
             }
+            Statement::ClassDeclaration { name, methods } => {
+                self.environment
+                    .borrow_mut()
+                    .define(name.clone(), objref(LoxObject::Nil));
+
+                let methods_vec = methods
+                    .iter()
+                    .map(|meth_stmt| {
+                        let method = self.eval_function_statement(meth_stmt);
+                        (method.name(), method)
+                    })
+                    .collect();
+
+                let class = Rc::new(Class::new(name.clone(), methods_vec));
+                self.environment
+                    .borrow_mut()
+                    .assign(name.clone(), objref(LoxObject::Class(class)))?;
+                Ok(())
+            }
         }
+    }
+
+    fn eval_function_statement(&mut self, func_stmt: &FunctionStatement) -> Rc<Function> {
+        let FunctionStatement {
+            name,
+            parameters,
+            body,
+        } = func_stmt;
+        Rc::new(Function::Defined {
+            name: name.clone(),
+            parameters: parameters.clone(),
+            code_block: body.clone(),
+            closure: Rc::clone(&self.environment),
+        })
     }
 
     fn exec_block(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
@@ -154,7 +180,38 @@ impl Interpreter {
                 right,
             } => self.eval_logical(left, operator, right),
             Expression::Call { callee, arguments } => self.eval_call_expr(callee, arguments),
+            Expression::Get { object, name } => self.eval_get(object, name),
+            Expression::Set {
+                object,
+                name,
+                expression,
+            } => self.eval_set(object, name, expression),
         }
+    }
+
+    fn eval_get(&mut self, object: &Expression, name: &String) -> Result<ObjRef, Interruption> {
+        let instance_ref = self.eval_expression(object)?;
+        match &*instance_ref {
+            LoxObject::Instance(instance) => instance.get(name),
+            _ => Err(runtime_error("Only instances have attributes.".to_string())),
+        }
+    }
+
+    fn eval_set(
+        &mut self,
+        object: &Expression,
+        name: &str,
+        expression: &Expression,
+    ) -> Result<ObjRef, Interruption> {
+        let instance_ref = self.eval_expression(object)?;
+        if let LoxObject::Instance(instance) = &*instance_ref {
+            let value_ref = self.eval_expression(expression)?;
+            instance.set(name.to_owned(), value_ref)?
+        } else {
+            return Err(runtime_error("Only instances have fields.".to_string()));
+        }
+
+        Ok(objref(LoxObject::Nil))
     }
 
     fn eval_variable(
@@ -182,7 +239,9 @@ impl Interpreter {
                 .borrow_mut()
                 .assign_at(distance, name, value.clone())?;
         } else {
-            self.globals.borrow_mut().assign(name, value.clone())?
+            self.globals
+                .borrow_mut()
+                .assign(name.clone(), value.clone())?
         }
         Ok(value)
     }
@@ -262,18 +321,30 @@ impl Interpreter {
             .iter()
             .map(|expr| self.eval_expression(expr))
             .collect::<Result<Vec<ObjRef>, Interruption>>()?;
-        match &*callee_obj {
+        match callee_obj.as_ref() {
+            LoxObject::Class(class) => {
+                if class.arity() != args.len() {
+                    return Err(runtime_error(format!(
+                        "{} takes {} arguments, but {} provided",
+                        class,
+                        class.arity(),
+                        args.len()
+                    )));
+                }
+
+                Ok(objref(LoxObject::Instance(Instance::new(Rc::clone(class)))))
+            }
             LoxObject::Function(func) => {
                 if func.arity() as usize != args.len() {
                     return Err(runtime_error(format!(
                         "{} takes {} arguments, but {} provided",
-                        func.format(),
+                        func,
                         func.arity(),
                         args.len()
                     )));
                 };
 
-                match func {
+                match func.as_ref() {
                     Function::Native { callable, .. } => Ok(callable(&args)?),
                     Function::Defined {
                         parameters,

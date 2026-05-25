@@ -1,0 +1,12 @@
+class Dog {
+  bark() {
+    return "Bark!";
+  }
+}
+
+var puppy = Dog();
+puppy.color = "red";
+
+print "Puppy color is " + puppy.color;
+
+print puppy.bark();

@@ -3,10 +3,10 @@ use std::{cell::RefCell, iter::Peekable};
 
 use crate::{
     ast::{
-        BinaryOperator, Expression, LiteralValue, LogicalOperator, Program, Statement,
-        UnaryOperator,
+        BinaryOperator, Expression, FunctionStatement, LiteralValue, LogicalOperator, Program,
+        Statement, UnaryOperator,
     },
-    interruption::{Interruption, parser_error},
+    interruption::{Interruption, brake_inter, parser_error},
     token::{Token, TokenType},
 };
 
@@ -48,24 +48,55 @@ impl<'a> Parser<'a> {
         match self.peek().token_type {
             TokenType::Fun => {
                 self.advance();
-                self.fun_declaration()
+                self.fun_declaration().map(Statement::FunctionDeclaration)
             }
             TokenType::Var => {
                 self.advance();
                 self.var_declaration()
             }
+            TokenType::Class => {
+                self.advance();
+                self.class_declaration()
+            }
             _ => self.statement(),
         }
     }
 
-    fn fun_declaration(&mut self) -> Result<Statement, Interruption> {
+    fn class_declaration(&mut self) -> Result<Statement, Interruption> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
             return Err(parser_error(
                 self.peek().clone(),
-                "Expected function name after 'fun'.",
+                "Expected class name after 'class'.",
             ));
+        };
+        self.advance();
+
+        self.expect_token(TokenType::LeftBrace, "Expect '{' before class body.")?;
+
+        let mut methods: Vec<FunctionStatement> = Vec::new();
+
+        loop {
+            if matches!(
+                self.peek().token_type,
+                TokenType::Eof | TokenType::RightBrace
+            ) {
+                break;
+            }
+            methods.push(self.fun_declaration()?);
+        }
+
+        self.expect_token(TokenType::RightBrace, "Expect '}' after class body.")?;
+
+        Ok(Statement::ClassDeclaration { name, methods })
+    }
+
+    fn fun_declaration(&mut self) -> Result<FunctionStatement, Interruption> {
+        let name = if let TokenType::Identifier(name) = &self.peek().token_type {
+            name.clone()
+        } else {
+            return Err(parser_error(self.peek().clone(), "Expected function name."));
         };
         self.advance();
         self.expect_token(TokenType::LeftParen, "Expected '(' after function name")?;
@@ -110,7 +141,7 @@ impl<'a> Parser<'a> {
             stmt
         };
 
-        Ok(Statement::FunctionDeclaration {
+        Ok(FunctionStatement {
             name,
             parameters,
             body: Box::new(block),
@@ -346,6 +377,15 @@ impl<'a> Parser<'a> {
                         resolved_scope_depth: RefCell::new(None),
                     });
                 }
+                Expression::Get { object, name } => {
+                    let value = self.assignment()?;
+                    return Ok(Expression::Set {
+                        object,
+                        name,
+                        expression: Box::new(value),
+                    });
+                }
+
                 _ => return Err(parser_error(tok.clone(), "Invalid assignment target.")),
             }
         }
@@ -485,12 +525,37 @@ impl<'a> Parser<'a> {
 
     fn call(&mut self) -> Result<Expression, Interruption> {
         let mut expr = self.primary()?;
-
-        while let TokenType::LeftParen = self.peek().token_type {
-            self.advance();
-            expr = self.finish_call(Box::new(expr))?;
+        loop {
+            expr = match self.peek().token_type {
+                TokenType::LeftParen => {
+                    self.advance();
+                    self.finish_call(Box::new(expr))?
+                }
+                TokenType::Dot => {
+                    self.advance();
+                    self.finish_get(Box::new(expr))?
+                }
+                _ => break,
+            }
         }
         Ok(expr)
+    }
+
+    fn finish_get(&mut self, object: Box<Expression>) -> Result<Expression, Interruption> {
+        let field_name = match &self.peek().token_type {
+            TokenType::Identifier(name) => name.clone(),
+            _ => {
+                return Err(parser_error(
+                    self.peek().clone(),
+                    "Expected field name after '.'",
+                ));
+            }
+        };
+        self.advance();
+        Ok(Expression::Get {
+            object,
+            name: field_name,
+        })
     }
 
     fn finish_call(&mut self, callee: Box<Expression>) -> Result<Expression, Interruption> {

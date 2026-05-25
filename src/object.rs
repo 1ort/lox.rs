@@ -1,6 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
+use crate::class::{Class, Instance};
 use crate::function::Function;
 use crate::interruption::{Interruption, runtime_error};
 
@@ -10,7 +11,9 @@ pub enum LoxObject {
     String(String),
     Boolean(bool),
     Nil,
-    Function(Function),
+    Function(Rc<Function>),
+    Class(Rc<Class>),
+    Instance(Instance),
 }
 
 pub type ObjRef = Rc<LoxObject>;
@@ -201,6 +204,8 @@ impl std::fmt::Display for LoxObject {
             LoxObject::Boolean(val) => f.write_fmt(format_args!("{}", val)),
             LoxObject::Nil => f.write_str("nil"),
             LoxObject::Function(function) => f.write_fmt(format_args!("{}", function)),
+            LoxObject::Class(class) => f.write_fmt(format_args!("{}", class)),
+            LoxObject::Instance(instance) => f.write_fmt(format_args!("{}", instance)),
         }
     }
 }

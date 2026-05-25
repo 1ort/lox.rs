@@ -18,17 +18,17 @@ pub enum Function {
 }
 
 impl Function {
+    pub fn name(&self) -> String {
+        match self {
+            Self::Native { identifier, .. } => identifier,
+            Self::Defined { name, .. } => name,
+        }
+        .clone()
+    }
     pub fn arity(&self) -> u8 {
         match self {
             Function::Native { arity, .. } => *arity,
             Function::Defined { parameters, .. } => parameters.len() as u8,
-        }
-    }
-
-    pub fn format(&self) -> String {
-        match self {
-            Function::Native { identifier, .. } => format!("function '{}'", identifier),
-            Function::Defined { name, .. } => format!("function '{}'", name),
         }
     }
 }

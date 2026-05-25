@@ -30,14 +30,21 @@ pub enum Statement {
         body: Box<Statement>,
     },
     Break,
-    FunctionDeclaration {
-        name: String,
-        parameters: Vec<String>,
-        body: Box<Statement>,
-    },
+    FunctionDeclaration(FunctionStatement),
     Return {
         expresstion: Option<Box<Expression>>,
     },
+    ClassDeclaration {
+        name: String,
+        methods: Vec<FunctionStatement>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionStatement {
+    pub name: String,
+    pub parameters: Vec<String>,
+    pub body: Box<Statement>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +81,15 @@ pub enum Expression {
     Call {
         callee: Box<Expression>,
         arguments: Vec<Expression>,
+    },
+    Get {
+        object: Box<Expression>,
+        name: String,
+    },
+    Set {
+        object: Box<Expression>,
+        name: String,
+        expression: Box<Expression>,
     },
 }
 
