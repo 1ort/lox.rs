@@ -1,8 +1,5 @@
 use core::slice::Iter;
-use std::{
-    cell::{Ref, RefCell},
-    iter::Peekable,
-};
+use std::{cell::RefCell, iter::Peekable};
 
 use crate::{
     ast::{

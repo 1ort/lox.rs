@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::environment::{EnvRef, Environment};
 use crate::function::Function;
 use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
-use crate::object::LoxObject;
+use crate::object::{LoxObject, ObjRef, objref};
 
 use crate::globals;
 
@@ -55,7 +55,7 @@ impl Interpreter {
                 let value = if let Some(expression) = initializer {
                     self.eval_expression(expression)?
                 } else {
-                    LoxObject::Nil
+                    objref(LoxObject::Nil)
                 };
                 self.environment.borrow_mut().define(name.clone(), value);
                 Ok(())
@@ -91,20 +91,21 @@ impl Interpreter {
                 parameters,
                 body,
             } => {
-                self.environment.borrow_mut().define(
-                    name.clone(),
-                    LoxObject::Function(crate::function::Function::Defined {
-                        name: name.clone(),
-                        parameters: parameters.clone(),
-                        code_block: body.clone(),
-                        closure: Rc::clone(&self.environment),
-                    }),
-                );
+                let func = LoxObject::Function(crate::function::Function::Defined {
+                    name: name.clone(),
+                    parameters: parameters.clone(),
+                    code_block: body.clone(),
+                    closure: Rc::clone(&self.environment),
+                });
+
+                self.environment
+                    .borrow_mut()
+                    .define(name.clone(), objref(func));
                 Ok(())
             }
             Statement::Return { expresstion } => {
                 let expr_result = match expresstion {
-                    None => LoxObject::Nil,
+                    None => objref(LoxObject::Nil),
                     Some(expr) => self.eval_expression(expr)?,
                 };
                 Err(retun_inter(expr_result))
@@ -125,7 +126,7 @@ impl Interpreter {
         res
     }
 
-    fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, Interruption> {
+    fn eval_expression(&mut self, expr: &Expression) -> Result<ObjRef, Interruption> {
         match expr {
             Expression::Grouping { expression } => self.eval_expression(expression),
             Expression::Literal { value } => self.eval_literal_value(value),
@@ -160,7 +161,7 @@ impl Interpreter {
         &mut self,
         name: &String,
         scope_depth: &Option<usize>,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<ObjRef, Interruption> {
         let obj_ref = if let Some(distance) = *scope_depth {
             self.environment.borrow().get_at(distance, name)?
         } else {
@@ -174,7 +175,7 @@ impl Interpreter {
         name: &String,
         expression: &Expression,
         scope_depth: &Option<usize>,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<ObjRef, Interruption> {
         let value = self.eval_expression(expression)?;
         if let Some(distance) = *scope_depth {
             self.environment
@@ -186,20 +187,20 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<LoxObject, Interruption> {
-        Ok(match val {
+    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<ObjRef, Interruption> {
+        Ok(objref(match val {
             LiteralValue::Number(num) => LoxObject::Number(*num),
             LiteralValue::String(s) => LoxObject::String(s.clone()),
             LiteralValue::Boolean(b) => LoxObject::Boolean(*b),
             LiteralValue::Nil => LoxObject::Nil,
-        })
+        }))
     }
 
     fn eval_unary(
         &mut self,
         operator: &UnaryOperator,
         expression: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<ObjRef, Interruption> {
         let expr_value = self.eval_expression(expression)?;
         match operator {
             UnaryOperator::Minus => expr_value.neg(),
@@ -211,7 +212,7 @@ impl Interpreter {
         left: &Expression,
         operator: &BinaryOperator,
         right: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<ObjRef, Interruption> {
         let left = self.eval_expression(left)?;
         let right = self.eval_expression(right)?;
 
@@ -234,7 +235,7 @@ impl Interpreter {
         left: &Expression,
         operator: &LogicalOperator,
         right: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<ObjRef, Interruption> {
         let left_result = self.eval_expression(left)?;
         match operator {
             LogicalOperator::Or => {
@@ -255,13 +256,13 @@ impl Interpreter {
         &mut self,
         callee: &Expression,
         argument_expressions: &[Expression],
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<ObjRef, Interruption> {
         let callee_obj = self.eval_expression(callee)?;
         let args = argument_expressions
             .iter()
             .map(|expr| self.eval_expression(expr))
-            .collect::<Result<Vec<LoxObject>, Interruption>>()?;
-        match callee_obj {
+            .collect::<Result<Vec<ObjRef>, Interruption>>()?;
+        match &*callee_obj {
             LoxObject::Function(func) => {
                 if func.arity() as usize != args.len() {
                     return Err(runtime_error(format!(
@@ -279,7 +280,7 @@ impl Interpreter {
                         code_block,
                         closure,
                         ..
-                    } => self.eval_call(&parameters, &code_block, &args, closure),
+                    } => self.eval_call(parameters, code_block, &args, closure),
                 }
             }
             _ => Err(runtime_error(format!("'{}' is not callable", callee_obj))),
@@ -290,10 +291,10 @@ impl Interpreter {
         &mut self,
         parameters: &[String],
         code_block: &Statement,
-        args: &[LoxObject],
-        closure: EnvRef,
-    ) -> Result<LoxObject, Interruption> {
-        let environment = Environment::new_local(Rc::clone(&closure));
+        args: &[ObjRef],
+        closure: &EnvRef,
+    ) -> Result<ObjRef, Interruption> {
+        let environment = Environment::new_local(Rc::clone(closure));
         let old_environment = Rc::clone(&self.environment);
 
         self.environment = Rc::new(RefCell::new(environment));
@@ -307,7 +308,7 @@ impl Interpreter {
             .collect::<Vec<_>>();
 
         let result = match self.exec_statement(code_block) {
-            Ok(_) => LoxObject::Nil,
+            Ok(_) => objref(LoxObject::Nil),
             Err(Interruption::Return { object }) => object,
             Err(error) => return Err(error),
         };

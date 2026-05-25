@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     interruption::{Interruption, runtime_error},
-    object::LoxObject,
+    object::ObjRef,
 };
 
 pub type EnvRef = Rc<RefCell<Environment>>;
@@ -10,7 +10,7 @@ pub type EnvRef = Rc<RefCell<Environment>>;
 #[derive(Debug)]
 pub struct Environment {
     pub enclosing: Option<EnvRef>,
-    values: HashMap<String, LoxObject>,
+    values: HashMap<String, ObjRef>,
 }
 
 impl Environment {
@@ -28,11 +28,11 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: String, value: LoxObject) {
+    pub fn define(&mut self, name: String, value: ObjRef) {
         self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &String) -> Result<LoxObject, Interruption> {
+    pub fn get(&self, name: &String) -> Result<ObjRef, Interruption> {
         if let Some(value) = self.values.get(name) {
             Ok(value.clone())
         } else {
@@ -40,7 +40,7 @@ impl Environment {
         }
     }
 
-    pub fn get_at(&self, distance: usize, name: &String) -> Result<LoxObject, Interruption> {
+    pub fn get_at(&self, distance: usize, name: &String) -> Result<ObjRef, Interruption> {
         if distance == 0
             && let Some(value) = self.values.get(name)
         {
@@ -52,7 +52,7 @@ impl Environment {
         }
     }
 
-    pub fn assign(&mut self, name: &String, value: LoxObject) -> Result<(), Interruption> {
+    pub fn assign(&mut self, name: &String, value: ObjRef) -> Result<(), Interruption> {
         if self.values.contains_key(name) {
             self.values.insert(name.clone(), value);
             Ok(())
@@ -65,7 +65,7 @@ impl Environment {
         &mut self,
         distance: usize,
         name: &String,
-        value: LoxObject,
+        value: ObjRef,
     ) -> Result<(), Interruption> {
         if distance == 0 && self.values.contains_key(name) {
             self.values.insert(name.clone(), value);

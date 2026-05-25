@@ -1,13 +1,13 @@
 use core::fmt;
 
-use crate::{ast::Statement, environment::EnvRef, interruption::Interruption, object::LoxObject};
+use crate::{ast::Statement, environment::EnvRef, interruption::Interruption, object::ObjRef};
 
 #[derive(Debug, Clone)]
 pub enum Function {
     Native {
         identifier: String,
         arity: u8,
-        callable: fn(&[LoxObject]) -> Result<LoxObject, Interruption>,
+        callable: fn(&[ObjRef]) -> Result<ObjRef, Interruption>,
     },
     Defined {
         name: String,
