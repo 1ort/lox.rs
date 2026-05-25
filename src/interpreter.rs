@@ -89,7 +89,7 @@ impl Interpreter {
             }
             Statement::Break => Err(brake_inter()),
             Statement::FunctionDeclaration(func_stmt) => {
-                let func = self.eval_function_statement(func_stmt);
+                let func = self.eval_function_statement(func_stmt, Rc::clone(&self.environment));
 
                 self.environment
                     .borrow_mut()
@@ -108,10 +108,14 @@ impl Interpreter {
                     .borrow_mut()
                     .define(name.clone(), objref(LoxObject::Nil));
 
+                let closure = Rc::new(RefCell::new(Environment::new_local(Rc::clone(
+                    &self.environment,
+                ))));
+
                 let methods_vec = methods
                     .iter()
                     .map(|meth_stmt| {
-                        let method = self.eval_function_statement(meth_stmt);
+                        let method = self.eval_function_statement(meth_stmt, Rc::clone(&closure));
                         (method.name(), method)
                     })
                     .collect();
@@ -125,7 +129,11 @@ impl Interpreter {
         }
     }
 
-    fn eval_function_statement(&mut self, func_stmt: &FunctionStatement) -> Rc<Function> {
+    fn eval_function_statement(
+        &mut self,
+        func_stmt: &FunctionStatement,
+        closure: EnvRef,
+    ) -> Rc<Function> {
         let FunctionStatement {
             name,
             parameters,
@@ -134,8 +142,8 @@ impl Interpreter {
         Rc::new(Function::Defined {
             name: name.clone(),
             parameters: parameters.clone(),
-            code_block: body.clone(),
-            closure: Rc::clone(&self.environment),
+            code_block: Rc::new(*body.clone()),
+            closure: closure,
         })
     }
 
@@ -186,14 +194,25 @@ impl Interpreter {
                 name,
                 expression,
             } => self.eval_set(object, name, expression),
+            Expression::This {
+                resolved_scope_depth,
+            } => self.eval_variable(&"this".to_string(), &resolved_scope_depth.borrow()),
         }
     }
 
     fn eval_get(&mut self, object: &Expression, name: &String) -> Result<ObjRef, Interruption> {
         let instance_ref = self.eval_expression(object)?;
-        match &*instance_ref {
-            LoxObject::Instance(instance) => instance.get(name),
-            _ => Err(runtime_error("Only instances have attributes.".to_string())),
+        let attr = match &*instance_ref.clone() {
+            LoxObject::Instance(instance) => instance.get(name)?,
+            _ => return Err(runtime_error("Only instances have attributes.".to_string())),
+        };
+
+        if let LoxObject::Function(function) = attr.as_ref() {
+            Ok(objref(LoxObject::Function(Rc::new(
+                function.bind(&instance_ref),
+            ))))
+        } else {
+            Ok(attr)
         }
     }
 

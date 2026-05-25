@@ -1,6 +1,12 @@
 use core::fmt;
+use std::{cell::RefCell, rc::Rc};
 
-use crate::{ast::Statement, environment::EnvRef, interruption::Interruption, object::ObjRef};
+use crate::{
+    ast::Statement,
+    environment::{EnvRef, Environment},
+    interruption::Interruption,
+    object::ObjRef,
+};
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -12,7 +18,7 @@ pub enum Function {
     Defined {
         name: String,
         parameters: Vec<String>,
-        code_block: Box<Statement>,
+        code_block: Rc<Statement>,
         closure: EnvRef,
     },
 }
@@ -29,6 +35,27 @@ impl Function {
         match self {
             Function::Native { arity, .. } => *arity,
             Function::Defined { parameters, .. } => parameters.len() as u8,
+        }
+    }
+    pub fn bind(&self, obj: &ObjRef) -> Self {
+        match self {
+            Function::Native { .. } => unreachable!(),
+            Function::Defined {
+                name,
+                parameters,
+                code_block,
+                closure,
+            } => {
+                let mut new_env = Environment::new_local(Rc::clone(closure));
+                new_env.define("this".to_owned(), obj.clone());
+
+                Function::Defined {
+                    name: name.clone(),
+                    parameters: parameters.clone(),
+                    code_block: code_block.clone(),
+                    closure: Rc::new(RefCell::new(new_env)),
+                }
+            }
         }
     }
 }

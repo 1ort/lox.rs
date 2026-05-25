@@ -1,12 +1,30 @@
 class Dog {
-  bark() {
-    return "Bark!";
+  set_color(color) {
+    this.color = color;
   }
+
+   voice() {
+    return this.bark;
+   }
+
+   p() {
+    print this;
+   }
 }
 
-var puppy = Dog();
-puppy.color = "red";
+var puppy1 = Dog();
+var puppy2 = Dog();
+puppy2.p();
 
-print "Puppy color is " + puppy.color;
+puppy1.set_color("red");
+puppy2.set_color("green");
 
-print puppy.bark();
+print "Puppy 1 color is " + puppy1.color;
+print "Puppy 2 color is " + puppy2.color;
+
+puppy1.bark = "Bark!";
+puppy2.bark = "Woof!";
+
+print puppy1.voice();
+print puppy2.voice();
+

@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use crate::{
     ast::{Expression, FunctionStatement, Program, Statement},
     interruption::{Interruption, resolver_error},
-    object,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum DeclarationState {
     Declared,
     Defined,
@@ -16,12 +15,18 @@ enum DeclarationState {
 enum FunctionType {
     None,
     Function,
-    Method,
+}
+
+#[derive(Clone, Copy)]
+enum ClassType {
+    None,
+    Class,
 }
 
 pub struct Resolver {
     scopes: Vec<HashMap<String, DeclarationState>>,
     current_function_type: FunctionType,
+    current_class_type: ClassType,
 }
 
 impl Resolver {
@@ -29,6 +34,7 @@ impl Resolver {
         Resolver {
             scopes: Vec::new(),
             current_function_type: FunctionType::None,
+            current_class_type: ClassType::None,
         }
     }
 
@@ -85,6 +91,10 @@ impl Resolver {
     fn fill_expression_depth(&mut self, expr: &Expression, depth: usize) {
         match expr {
             Expression::Identifier {
+                resolved_scope_depth,
+                ..
+            }
+            | Expression::This {
                 resolved_scope_depth,
                 ..
             }
@@ -159,12 +169,19 @@ impl Resolver {
             Statement::ClassDeclaration { name, methods } => {
                 self.declare(name)?;
                 self.define(name);
+                self.begin_scope();
+                let enclosing_class_type = self.current_class_type;
+                self.current_class_type = ClassType::Class;
+                self.define("this");
                 methods.iter().try_for_each(|fun_stmt| {
                     let FunctionStatement {
                         parameters, body, ..
                     } = fun_stmt;
-                    self.resolve_function(parameters, body, FunctionType::Method)
-                })
+                    self.resolve_function(parameters, body, FunctionType::Function)
+                })?;
+                self.current_class_type = enclosing_class_type;
+                self.end_scope();
+                Ok(())
             }
         }
     }
@@ -239,6 +256,16 @@ impl Resolver {
             } => {
                 self.resolve_expression(object)?;
                 self.resolve_expression(expression)
+            }
+            Expression::This { .. } => {
+                if matches!(self.current_class_type, ClassType::Class) {
+                    self.resolve_local(expression, "this");
+                    Ok(())
+                } else {
+                    Err(resolver_error(
+                        "Can't use 'this' outside of class body.".to_string(),
+                    ))
+                }
             }
         }
     }

@@ -606,6 +606,9 @@ impl<'a> Parser<'a> {
                 name: name.clone(),
                 resolved_scope_depth: RefCell::new(None),
             },
+            TokenType::This => Expression::This {
+                resolved_scope_depth: RefCell::new(None),
+            },
             _ => return self.grouping(),
         };
         self.advance();

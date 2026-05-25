@@ -91,6 +91,9 @@ pub enum Expression {
         name: String,
         expression: Box<Expression>,
     },
+    This {
+        resolved_scope_depth: RefCell<Option<usize>>,
+    },
 }
 
 #[derive(Debug, Clone)]
