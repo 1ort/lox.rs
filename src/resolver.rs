@@ -15,6 +15,8 @@ enum DeclarationState {
 enum FunctionType {
     None,
     Function,
+    Method,
+    Initializer,
 }
 
 #[derive(Clone, Copy)]
@@ -154,12 +156,20 @@ impl Resolver {
                 self.resolve_expression(condition)?;
                 self.resolve_statement(body)
             }
-            Statement::Return { expresstion } => {
+            Statement::Return {
+                expresstion: expression,
+            } => {
                 if matches!(self.current_function_type, FunctionType::None) {
                     Err(resolver_error(
                         "Can't return from top-level code.".to_string(),
                     ))
-                } else if let Some(expr) = expresstion {
+                } else if matches!(self.current_function_type, FunctionType::Initializer)
+                    && expression.is_some()
+                {
+                    Err(resolver_error(
+                        "Can't return value from 'init' method.".to_string(),
+                    ))
+                } else if let Some(expr) = expression {
                     self.resolve_expression(expr)
                 } else {
                     Ok(())
@@ -175,9 +185,19 @@ impl Resolver {
                 self.define("this");
                 methods.iter().try_for_each(|fun_stmt| {
                     let FunctionStatement {
-                        parameters, body, ..
+                        parameters,
+                        body,
+                        name,
                     } = fun_stmt;
-                    self.resolve_function(parameters, body, FunctionType::Function)
+                    self.resolve_function(
+                        parameters,
+                        body,
+                        if name.eq("init") {
+                            FunctionType::Initializer
+                        } else {
+                            FunctionType::Method
+                        },
+                    )
                 })?;
                 self.current_class_type = enclosing_class_type;
                 self.end_scope();
@@ -263,7 +283,7 @@ impl Resolver {
                     Ok(())
                 } else {
                     Err(resolver_error(
-                        "Can't use 'this' outside of class body.".to_string(),
+                        "Can't use 'this' outside of class method.".to_string(),
                     ))
                 }
             }

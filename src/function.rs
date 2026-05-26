@@ -20,6 +20,7 @@ pub enum Function {
         parameters: Vec<String>,
         code_block: Rc<Statement>,
         closure: EnvRef,
+        is_initializer: bool,
     },
 }
 
@@ -45,6 +46,7 @@ impl Function {
                 parameters,
                 code_block,
                 closure,
+                is_initializer,
             } => {
                 let mut new_env = Environment::new_local(Rc::clone(closure));
                 new_env.define("this".to_owned(), obj.clone());
@@ -54,6 +56,7 @@ impl Function {
                     parameters: parameters.clone(),
                     code_block: code_block.clone(),
                     closure: Rc::new(RefCell::new(new_env)),
+                    is_initializer: *is_initializer,
                 }
             }
         }

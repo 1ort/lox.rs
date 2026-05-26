@@ -20,11 +20,14 @@ impl Class {
         }
     }
 
-    pub fn arity(&self) -> usize {
-        0
+    pub fn arity(&self) -> u8 {
+        match self.get_method("init") {
+            Some(func) => func.arity(),
+            None => 0,
+        }
     }
 
-    pub fn get_method(&self, name: &String) -> Option<Rc<Function>> {
+    pub fn get_method(&self, name: &str) -> Option<Rc<Function>> {
         self.methods.get(name).cloned()
     }
 }
@@ -49,17 +52,13 @@ impl Instance {
         }
     }
 
-    pub fn get(&self, name: &String) -> Result<ObjRef, Interruption> {
-        let maybe_field = self.fields.borrow().get(name).cloned();
-        if let Some(ref field) = maybe_field {
-            return Ok(Rc::clone(field));
+    pub fn get(&self, name: &str) -> Option<ObjRef> {
+        if let Some(ref field) = self.fields.borrow().get(name).cloned() {
+            return Some(Rc::clone(field));
         }
-        let maybe_method = self.class.get_method(name);
-        if let Some(method) = maybe_method {
-            Ok(Rc::new(LoxObject::Function(method)))
-        } else {
-            Err(runtime_error(format!("Undefined property '{}'.", name)))
-        }
+        self.class
+            .get_method(name)
+            .map(|method| Rc::new(LoxObject::Function(method)))
     }
 
     pub fn set(&self, name: String, value: ObjRef) -> Result<(), Interruption> {

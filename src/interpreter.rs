@@ -89,7 +89,8 @@ impl Interpreter {
             }
             Statement::Break => Err(brake_inter()),
             Statement::FunctionDeclaration(func_stmt) => {
-                let func = self.eval_function_statement(func_stmt, Rc::clone(&self.environment));
+                let func =
+                    self.eval_function_statement(func_stmt, Rc::clone(&self.environment), false);
 
                 self.environment
                     .borrow_mut()
@@ -115,7 +116,8 @@ impl Interpreter {
                 let methods_vec = methods
                     .iter()
                     .map(|meth_stmt| {
-                        let method = self.eval_function_statement(meth_stmt, Rc::clone(&closure));
+                        let method =
+                            self.eval_function_statement(meth_stmt, Rc::clone(&closure), true);
                         (method.name(), method)
                     })
                     .collect();
@@ -133,6 +135,7 @@ impl Interpreter {
         &mut self,
         func_stmt: &FunctionStatement,
         closure: EnvRef,
+        is_method: bool,
     ) -> Rc<Function> {
         let FunctionStatement {
             name,
@@ -144,6 +147,7 @@ impl Interpreter {
             parameters: parameters.clone(),
             code_block: Rc::new(*body.clone()),
             closure: closure,
+            is_initializer: is_method && name.eq("init"),
         })
     }
 
@@ -203,9 +207,10 @@ impl Interpreter {
     fn eval_get(&mut self, object: &Expression, name: &String) -> Result<ObjRef, Interruption> {
         let instance_ref = self.eval_expression(object)?;
         let attr = match &*instance_ref.clone() {
-            LoxObject::Instance(instance) => instance.get(name)?,
+            LoxObject::Instance(instance) => instance.get(name),
             _ => return Err(runtime_error("Only instances have attributes.".to_string())),
-        };
+        }
+        .ok_or(runtime_error(format!("Undefined property '{}'.", name)))?;
 
         if let LoxObject::Function(function) = attr.as_ref() {
             Ok(objref(LoxObject::Function(Rc::new(
@@ -342,7 +347,7 @@ impl Interpreter {
             .collect::<Result<Vec<ObjRef>, Interruption>>()?;
         match callee_obj.as_ref() {
             LoxObject::Class(class) => {
-                if class.arity() != args.len() {
+                if class.arity() as usize != args.len() {
                     return Err(runtime_error(format!(
                         "{} takes {} arguments, but {} provided",
                         class,
@@ -351,7 +356,10 @@ impl Interpreter {
                     )));
                 }
 
-                Ok(objref(LoxObject::Instance(Instance::new(Rc::clone(class)))))
+                let instance = Instance::new(Rc::clone(class));
+                let instance_ref = objref(LoxObject::Instance(instance));
+                self.initialize_instance(&instance_ref, &args)?;
+                Ok(instance_ref)
             }
             LoxObject::Function(func) => {
                 if func.arity() as usize != args.len() {
@@ -369,11 +377,39 @@ impl Interpreter {
                         parameters,
                         code_block,
                         closure,
+                        is_initializer,
                         ..
-                    } => self.eval_call(parameters, code_block, &args, closure),
+                    } => self.eval_call(parameters, code_block, &args, closure, *is_initializer),
                 }
             }
             _ => Err(runtime_error(format!("'{}' is not callable", callee_obj))),
+        }
+    }
+
+    fn initialize_instance(
+        &mut self,
+        instance_ref: &ObjRef,
+        args: &[ObjRef],
+    ) -> Result<ObjRef, Interruption> {
+        if let LoxObject::Instance(instance) = Rc::clone(instance_ref).as_ref()
+            && let Some(attr_ref) = instance.get("init").clone()
+            && let LoxObject::Function(init) = attr_ref.clone().as_ref()
+        {
+            let method = init.bind(instance_ref);
+            match method {
+                Function::Native { .. } => unreachable!(), // init can not be builtin
+                Function::Defined {
+                    parameters,
+                    code_block,
+                    closure,
+                    is_initializer,
+                    ..
+                } => {
+                    Ok(self.eval_call(&parameters, &code_block, args, &closure, is_initializer)?)
+                }
+            }
+        } else {
+            Ok(instance_ref.clone())
         }
     }
 
@@ -383,6 +419,7 @@ impl Interpreter {
         code_block: &Statement,
         args: &[ObjRef],
         closure: &EnvRef,
+        is_initializer: bool,
     ) -> Result<ObjRef, Interruption> {
         let environment = Environment::new_local(Rc::clone(closure));
         let old_environment = Rc::clone(&self.environment);
@@ -398,8 +435,20 @@ impl Interpreter {
             .collect::<Vec<_>>();
 
         let result = match self.exec_statement(code_block) {
-            Ok(_) => objref(LoxObject::Nil),
-            Err(Interruption::Return { object }) => object,
+            Ok(_) => {
+                if is_initializer {
+                    closure.borrow().get_at(0, &"this".to_string())?
+                } else {
+                    objref(LoxObject::Nil)
+                }
+            }
+            Err(Interruption::Return { object }) => {
+                if is_initializer {
+                    closure.borrow().get_at(0, &"this".to_string())?
+                } else {
+                    object
+                }
+            }
             Err(error) => return Err(error),
         };
 
