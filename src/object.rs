@@ -74,13 +74,13 @@ impl LoxObject {
                 }
             }
             (Nil, Nil) => Ok(Boolean(true)),
-            (Function(_), Function(_)) => Err(runtime_error(
-                "Can not compare function objects".to_string(),
-            )),
-            (Class(this_class), Class(other_class)) => Ok(Boolean(std::ptr::eq(
-                this_class.as_ref(),
-                other_class.as_ref(),
-            ))),
+            (Function(this), Function(other)) => {
+                Ok(Boolean(std::ptr::eq(this.as_ref(), other.as_ref())))
+            }
+            (Class(this), Class(other)) => Ok(Boolean(std::ptr::eq(this.as_ref(), other.as_ref()))),
+            (Instance(this), Instance(other)) => {
+                Ok(Boolean(std::ptr::eq(this.as_ref(), other.as_ref())))
+            }
             _ => Ok(Boolean(false)),
         }
     }
