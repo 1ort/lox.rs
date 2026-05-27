@@ -184,13 +184,14 @@ impl Resolver {
                 let enclosing_class_type = self.current_class_type;
                 self.current_class_type = ClassType::Class;
 
-                self.define("this");
                 methods.iter().try_for_each(|fun_stmt| {
                     let FunctionStatement {
                         parameters,
                         body,
                         name,
                     } = fun_stmt;
+                    self.begin_scope();
+                    self.define("this");
                     self.resolve_function(
                         parameters,
                         body,
@@ -199,7 +200,9 @@ impl Resolver {
                         } else {
                             FunctionType::Function
                         },
-                    )
+                    )?;
+                    self.end_scope();
+                    Ok(())
                 })?;
                 self.current_class_type = enclosing_class_type;
                 self.end_scope();
