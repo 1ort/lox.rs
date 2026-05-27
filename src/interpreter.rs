@@ -230,12 +230,11 @@ impl Interpreter {
         let instance_ref = self.eval_expression(object)?;
         if let LoxObject::Instance(instance) = &*instance_ref {
             let value_ref = self.eval_expression(expression)?;
-            instance.set(name.to_owned(), value_ref)?
+            instance.set(name.to_owned(), value_ref.clone())?;
+            Ok(value_ref)
         } else {
-            return Err(runtime_error("Only instances have fields.".to_string()));
+            Err(runtime_error("Only instances have fields.".to_string()))
         }
-
-        Ok(objref(LoxObject::Nil))
     }
 
     fn eval_variable(

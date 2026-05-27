@@ -85,7 +85,10 @@ impl LoxObject {
             (Function(_), Function(_)) => Err(runtime_error(
                 "Can not compare function objects".to_string(),
             )),
-
+            (Class(this_class), Class(other_class)) => Ok(Boolean(std::ptr::eq(
+                this_class.as_ref(),
+                other_class.as_ref(),
+            ))),
             _ => Ok(Boolean(false)),
         }
         .map(objref)
