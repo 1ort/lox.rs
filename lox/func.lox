@@ -1,8 +1,0 @@
-fun sum(a, b) {
-    return a+b;
-  }
-
-print sum(1, 2);
-print sum("hello", " world");
-print sum(-2, 5);
-
