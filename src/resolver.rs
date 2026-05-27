@@ -55,15 +55,13 @@ impl Resolver {
             scope.insert(name.to_string(), DeclarationState::Declared);
             Ok(())
         } else {
-            unreachable!()
+            Ok(())
         }
     }
 
     fn define(&mut self, name: &str) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.to_string(), DeclarationState::Defined);
-        } else {
-            unreachable!()
         }
     }
 
@@ -108,7 +106,6 @@ impl Resolver {
     }
 
     pub fn resolve_program(&mut self, program: &Program) -> Result<(), Interruption> {
-        self.begin_scope();
         let mut iterator = program.statements.iter();
 
         for result in iterator.by_ref().map(|stmt| self.resolve_statement(stmt)) {
@@ -296,10 +293,12 @@ impl Resolver {
             unreachable!()
         };
 
-        if matches!(
-            self.get_state_in_current_scope(name),
-            Some(DeclarationState::Declared)
-        ) {
+        if !self.scopes.is_empty()
+            && matches!(
+                self.get_state_in_current_scope(name),
+                Some(DeclarationState::Declared)
+            )
+        {
             return Err(resolver_error(format!(
                 "Can't read local variable in its own initializer: '{}'.",
                 name

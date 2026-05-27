@@ -34,7 +34,7 @@ impl Class {
 
 impl std::fmt::Display for Class {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("Class '{}'", self.name))
+        f.write_str(&self.name)
     }
 }
 
@@ -67,7 +67,7 @@ impl Instance {
 
 impl std::fmt::Display for Instance {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("Instance of "))?;
-        self.class.fmt(f)
+        self.class.fmt(f)?;
+        f.write_fmt(format_args!(" instance"))
     }
 }
