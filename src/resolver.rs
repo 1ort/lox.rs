@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Program, Statement},
+    class::Class,
     interruption::{Interruption, resolver_error},
 };
 
@@ -15,7 +16,6 @@ enum DeclarationState {
 enum FunctionType {
     None,
     Function,
-    Method,
     Initializer,
 }
 
@@ -28,6 +28,7 @@ enum ClassType {
 pub struct Resolver {
     scopes: Vec<HashMap<String, DeclarationState>>,
     current_function_type: FunctionType,
+    current_class_type: ClassType,
 }
 
 impl Resolver {
@@ -35,6 +36,7 @@ impl Resolver {
         Resolver {
             scopes: Vec::new(),
             current_function_type: FunctionType::None,
+            current_class_type: ClassType::None,
         }
     }
 
@@ -178,6 +180,10 @@ impl Resolver {
                 self.declare(name)?;
                 self.define(name);
                 self.begin_scope();
+
+                let enclosing_class_type = self.current_class_type;
+                self.current_class_type = ClassType::Class;
+
                 self.define("this");
                 methods.iter().try_for_each(|fun_stmt| {
                     let FunctionStatement {
@@ -191,10 +197,11 @@ impl Resolver {
                         if name.eq("init") {
                             FunctionType::Initializer
                         } else {
-                            FunctionType::Method
+                            FunctionType::Function
                         },
                     )
                 })?;
+                self.current_class_type = enclosing_class_type;
                 self.end_scope();
                 Ok(())
             }
@@ -273,7 +280,7 @@ impl Resolver {
                 self.resolve_expression(expression)
             }
             Expression::This { .. } => {
-                if matches!(self.current_function_type, FunctionType::Method) {
+                if matches!(self.current_class_type, ClassType::Class) {
                     self.resolve_local(expression, "this");
                     Ok(())
                 } else {
