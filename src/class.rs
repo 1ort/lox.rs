@@ -1,10 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use crate::{
-    function::Function,
-    interruption::{Interruption, runtime_error},
-    object::{LoxObject, ObjRef},
-};
+use crate::{function::Function, interruption::Interruption, object::LoxObject};
 
 #[derive(Debug)]
 pub struct Class {
@@ -30,6 +26,10 @@ impl Class {
     pub fn get_method(&self, name: &str) -> Option<Rc<Function>> {
         self.methods.get(name).cloned()
     }
+
+    pub fn get_initializer(&self) -> Option<Rc<Function>> {
+        self.methods.get("init").cloned()
+    }
 }
 
 impl std::fmt::Display for Class {
@@ -41,7 +41,7 @@ impl std::fmt::Display for Class {
 #[derive(Debug)]
 pub struct Instance {
     class: Rc<Class>,
-    fields: RefCell<HashMap<String, ObjRef>>,
+    fields: RefCell<HashMap<String, LoxObject>>,
 }
 
 impl Instance {
@@ -52,16 +52,14 @@ impl Instance {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<ObjRef> {
+    pub fn get(&self, name: &str) -> Option<LoxObject> {
         if let Some(ref field) = self.fields.borrow().get(name).cloned() {
-            return Some(Rc::clone(field));
+            return Some(field.clone());
         }
-        self.class
-            .get_method(name)
-            .map(|method| Rc::new(LoxObject::Function(method)))
+        self.class.get_method(name).map(LoxObject::Function)
     }
 
-    pub fn set(&self, name: String, value: ObjRef) -> Result<(), Interruption> {
+    pub fn set(&self, name: String, value: LoxObject) -> Result<(), Interruption> {
         self.fields.borrow_mut().insert(name, value);
         Ok(())
     }

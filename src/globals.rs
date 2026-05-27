@@ -1,7 +1,7 @@
 use crate::environment::Environment;
 use crate::function::Function;
 use crate::interruption::runtime_error;
-use crate::object::{LoxObject, objref};
+use crate::object::LoxObject;
 
 use std::rc::Rc;
 use std::thread;
@@ -20,17 +20,17 @@ pub fn build_globals() -> Environment {
                 .duration_since(UNIX_EPOCH)
                 .expect("time should go forward")
                 .as_millis() as f64;
-            Ok(objref(LoxObject::Number(millis)))
+            Ok(LoxObject::Number(millis))
         },
     }));
-    globals.define("clock".to_string(), objref(clock));
+    globals.define("clock".to_string(), clock);
 
     let sleep = LoxObject::Function(Rc::new(Function::Native {
         identifier: "sleep".to_string(),
         arity: 1,
         callable: |args| {
             let duration = args[0].clone();
-            match *duration {
+            match duration {
                 LoxObject::Number(secs) => {
                     thread::sleep(Duration::from_secs_f64(secs));
                     Ok(LoxObject::Nil)
@@ -40,17 +40,13 @@ pub fn build_globals() -> Environment {
                     duration
                 ))),
             }
-            .map(objref)
         },
     }));
 
-    globals.define("sleep".to_string(), objref(sleep));
+    globals.define("sleep".to_string(), sleep);
     globals.define(
         "_version_".to_string(),
-        objref(LoxObject::String(format!(
-            "Lox.rs v{}",
-            env!("CARGO_PKG_VERSION")
-        ))),
+        LoxObject::String(format!("Lox.rs v{}", env!("CARGO_PKG_VERSION"))),
     );
 
     globals

@@ -9,7 +9,7 @@ use crate::class::{Class, Instance};
 use crate::environment::{EnvRef, Environment};
 use crate::function::Function;
 use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
-use crate::object::{self, LoxObject, ObjRef, objref};
+use crate::object::LoxObject;
 
 use crate::globals;
 
@@ -57,7 +57,7 @@ impl Interpreter {
                 let value = if let Some(expression) = initializer {
                     self.eval_expression(expression)?
                 } else {
-                    objref(LoxObject::Nil)
+                    LoxObject::Nil
                 };
                 self.environment.borrow_mut().define(name.clone(), value);
                 Ok(())
@@ -94,12 +94,12 @@ impl Interpreter {
 
                 self.environment
                     .borrow_mut()
-                    .define(func.name(), objref(LoxObject::Function(func)));
+                    .define(func.name().to_owned(), LoxObject::Function(func));
                 Ok(())
             }
             Statement::Return { expresstion } => {
                 let expr_result = match expresstion {
-                    None => objref(LoxObject::Nil),
+                    None => LoxObject::Nil,
                     Some(expr) => self.eval_expression(expr)?,
                 };
                 Err(retun_inter(expr_result))
@@ -107,7 +107,7 @@ impl Interpreter {
             Statement::ClassDeclaration { name, methods } => {
                 self.environment
                     .borrow_mut()
-                    .define(name.clone(), objref(LoxObject::Nil));
+                    .define(name.clone(), LoxObject::Nil);
 
                 let closure = Rc::new(RefCell::new(Environment::new_local(Rc::clone(
                     &self.environment,
@@ -118,14 +118,14 @@ impl Interpreter {
                     .map(|meth_stmt| {
                         let method =
                             self.eval_function_statement(meth_stmt, Rc::clone(&closure), true);
-                        (method.name(), method)
+                        (method.name().to_owned(), method)
                     })
                     .collect();
 
                 let class = Rc::new(Class::new(name.clone(), methods_vec));
                 self.environment
                     .borrow_mut()
-                    .assign(name.clone(), objref(LoxObject::Class(class)))?;
+                    .assign(name.clone(), LoxObject::Class(class))?;
                 Ok(())
             }
         }
@@ -146,7 +146,7 @@ impl Interpreter {
             name: name.clone(),
             parameters: parameters.clone(),
             code_block: Rc::new(*body.clone()),
-            closure: closure,
+            closure,
             is_initializer: is_method && name.eq("init"),
         })
     }
@@ -164,7 +164,7 @@ impl Interpreter {
         res
     }
 
-    fn eval_expression(&mut self, expr: &Expression) -> Result<ObjRef, Interruption> {
+    fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, Interruption> {
         match expr {
             Expression::Grouping { expression } => self.eval_expression(expression),
             Expression::Literal { value } => self.eval_literal_value(value),
@@ -204,18 +204,17 @@ impl Interpreter {
         }
     }
 
-    fn eval_get(&mut self, object: &Expression, name: &String) -> Result<ObjRef, Interruption> {
-        let instance_ref = self.eval_expression(object)?;
-        let attr = match &*instance_ref.clone() {
+    fn eval_get(&mut self, object: &Expression, name: &String) -> Result<LoxObject, Interruption> {
+        let obj = self.eval_expression(object)?;
+
+        let attr = match &obj {
             LoxObject::Instance(instance) => instance.get(name),
             _ => return Err(runtime_error("Only instances have attributes.".to_string())),
         }
         .ok_or(runtime_error(format!("Undefined property '{}'.", name)))?;
-
-        if let LoxObject::Function(function) = attr.as_ref() {
-            Ok(objref(LoxObject::Function(Rc::new(
-                function.bind(&instance_ref),
-            ))))
+        if let LoxObject::Function(function) = attr {
+            let bound_method = function.bind(obj);
+            Ok(LoxObject::Function(Rc::new(bound_method)))
         } else {
             Ok(attr)
         }
@@ -226,9 +225,9 @@ impl Interpreter {
         object: &Expression,
         name: &str,
         expression: &Expression,
-    ) -> Result<ObjRef, Interruption> {
-        let instance_ref = self.eval_expression(object)?;
-        if let LoxObject::Instance(instance) = &*instance_ref {
+    ) -> Result<LoxObject, Interruption> {
+        let obj = self.eval_expression(object)?;
+        if let LoxObject::Instance(instance) = obj {
             let value_ref = self.eval_expression(expression)?;
             instance.set(name.to_owned(), value_ref.clone())?;
             Ok(value_ref)
@@ -241,13 +240,13 @@ impl Interpreter {
         &mut self,
         name: &String,
         scope_depth: &Option<usize>,
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let obj_ref = if let Some(distance) = *scope_depth {
             self.environment.borrow().get_at(distance, name)?
         } else {
             self.globals.borrow().get(name)?
         };
-        Ok(obj_ref.clone())
+        Ok(obj_ref)
     }
 
     fn eval_assignment(
@@ -255,7 +254,7 @@ impl Interpreter {
         name: &String,
         expression: &Expression,
         scope_depth: &Option<usize>,
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let value = self.eval_expression(expression)?;
         if let Some(distance) = *scope_depth {
             self.environment
@@ -269,20 +268,20 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<ObjRef, Interruption> {
-        Ok(objref(match val {
+    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<LoxObject, Interruption> {
+        Ok(match val {
             LiteralValue::Number(num) => LoxObject::Number(*num),
             LiteralValue::String(s) => LoxObject::String(s.clone()),
             LiteralValue::Boolean(b) => LoxObject::Boolean(*b),
             LiteralValue::Nil => LoxObject::Nil,
-        }))
+        })
     }
 
     fn eval_unary(
         &mut self,
         operator: &UnaryOperator,
         expression: &Expression,
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let expr_value = self.eval_expression(expression)?;
         match operator {
             UnaryOperator::Minus => expr_value.neg(),
@@ -294,7 +293,7 @@ impl Interpreter {
         left: &Expression,
         operator: &BinaryOperator,
         right: &Expression,
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let left = self.eval_expression(left)?;
         let right = self.eval_expression(right)?;
 
@@ -317,7 +316,7 @@ impl Interpreter {
         left: &Expression,
         operator: &LogicalOperator,
         right: &Expression,
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let left_result = self.eval_expression(left)?;
         match operator {
             LogicalOperator::Or => {
@@ -338,28 +337,14 @@ impl Interpreter {
         &mut self,
         callee: &Expression,
         argument_expressions: &[Expression],
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let callee_obj = self.eval_expression(callee)?;
         let args = argument_expressions
             .iter()
             .map(|expr| self.eval_expression(expr))
-            .collect::<Result<Vec<ObjRef>, Interruption>>()?;
-        match callee_obj.as_ref() {
-            LoxObject::Class(class) => {
-                if class.arity() as usize != args.len() {
-                    return Err(runtime_error(format!(
-                        "{} takes {} arguments, but {} provided",
-                        class,
-                        class.arity(),
-                        args.len()
-                    )));
-                }
-
-                let instance = Instance::new(Rc::clone(class));
-                let instance_ref = objref(LoxObject::Instance(instance));
-                self.initialize_instance(&instance_ref, &args)?;
-                Ok(instance_ref)
-            }
+            .collect::<Result<Vec<LoxObject>, Interruption>>()?;
+        match &callee_obj {
+            LoxObject::Class(class) => self.instantiate(class, &args),
             LoxObject::Function(func) => {
                 if func.arity() as usize != args.len() {
                     return Err(runtime_error(format!(
@@ -385,41 +370,52 @@ impl Interpreter {
         }
     }
 
-    fn initialize_instance(
+    fn instantiate(
         &mut self,
-        instance_ref: &ObjRef,
-        args: &[ObjRef],
-    ) -> Result<ObjRef, Interruption> {
-        if let LoxObject::Instance(instance) = Rc::clone(instance_ref).as_ref()
-            && let Some(attr_ref) = instance.get("init").clone()
-            && let LoxObject::Function(init) = attr_ref.clone().as_ref()
-        {
-            let method = init.bind(instance_ref);
-            match method {
-                Function::Native { .. } => unreachable!(), // init can not be builtin
+        class: &Rc<Class>,
+        arguments: &[LoxObject],
+    ) -> Result<LoxObject, Interruption> {
+        if class.arity() as usize != arguments.len() {
+            return Err(runtime_error(format!(
+                "{} takes {} arguments, but {} provided",
+                class,
+                class.arity(),
+                arguments.len()
+            )));
+        }
+        let instance_rc = Rc::new(Instance::new(Rc::clone(class)));
+        let object = LoxObject::Instance(instance_rc);
+
+        if let Some(initializer) = class.get_initializer() {
+            let bound_method = initializer.bind(object.clone());
+            match bound_method {
                 Function::Defined {
                     parameters,
                     code_block,
                     closure,
                     is_initializer,
                     ..
-                } => {
-                    Ok(self.eval_call(&parameters, &code_block, args, &closure, is_initializer)?)
-                }
-            }
-        } else {
-            Ok(instance_ref.clone())
+                } => self.eval_call(
+                    &parameters,
+                    &code_block,
+                    arguments,
+                    &closure,
+                    is_initializer,
+                )?,
+                _ => unreachable!(), // only user functions could be initializers
+            };
         }
+        Ok(object)
     }
 
     fn eval_call(
         &mut self,
         parameters: &[String],
         code_block: &Statement,
-        args: &[ObjRef],
+        args: &[LoxObject],
         closure: &EnvRef,
         is_initializer: bool,
-    ) -> Result<ObjRef, Interruption> {
+    ) -> Result<LoxObject, Interruption> {
         let environment = Environment::new_local(Rc::clone(closure));
         let old_environment = Rc::clone(&self.environment);
 
@@ -438,7 +434,7 @@ impl Interpreter {
                 if is_initializer {
                     closure.borrow().get_at(0, &"this".to_string())?
                 } else {
-                    objref(LoxObject::Nil)
+                    LoxObject::Nil
                 }
             }
             Err(Interruption::Return { object }) => {

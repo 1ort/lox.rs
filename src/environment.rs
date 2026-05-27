@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, collections::hash_map::Entry, rc::Rc};
 
 use crate::{
     interruption::{Interruption, runtime_error},
-    object::ObjRef,
+    object::LoxObject,
 };
 
 pub type EnvRef = Rc<RefCell<Environment>>;
@@ -10,7 +10,7 @@ pub type EnvRef = Rc<RefCell<Environment>>;
 #[derive(Debug)]
 pub struct Environment {
     pub enclosing: Option<EnvRef>,
-    values: HashMap<String, ObjRef>,
+    values: HashMap<String, LoxObject>,
 }
 
 impl Environment {
@@ -28,11 +28,11 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: String, value: ObjRef) {
+    pub fn define(&mut self, name: String, value: LoxObject) {
         self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &String) -> Result<ObjRef, Interruption> {
+    pub fn get(&self, name: &String) -> Result<LoxObject, Interruption> {
         if let Some(value) = self.values.get(name) {
             Ok(value.clone())
         } else {
@@ -40,7 +40,7 @@ impl Environment {
         }
     }
 
-    pub fn get_at(&self, distance: usize, name: &String) -> Result<ObjRef, Interruption> {
+    pub fn get_at(&self, distance: usize, name: &String) -> Result<LoxObject, Interruption> {
         if distance == 0
             && let Some(value) = self.values.get(name)
         {
@@ -52,12 +52,10 @@ impl Environment {
         }
     }
 
-    pub fn assign(&mut self, name: String, value: ObjRef) -> Result<(), Interruption> {
-        if self.values.contains_key(&name) {
-            self.values.insert(name, value);
-            Ok(())
-        } else {
-            Err(runtime_error(format!("Undefined variable: {} .", name)))
+    pub fn assign(&mut self, name: String, value: LoxObject) -> Result<(), Interruption> {
+        match self.values.entry(name.clone()).and_modify(|x| *x = value) {
+            Entry::Vacant(_) => Err(runtime_error(format!("Undefined variable: {} .", name))),
+            Entry::Occupied(_) => Ok(()),
         }
     }
 
@@ -65,7 +63,7 @@ impl Environment {
         &mut self,
         distance: usize,
         name: &String,
-        value: ObjRef,
+        value: LoxObject,
     ) -> Result<(), Interruption> {
         if distance == 0 && self.values.contains_key(name) {
             self.values.insert(name.clone(), value);

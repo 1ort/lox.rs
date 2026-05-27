@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Program, Statement},
-    class::Class,
     interruption::{Interruption, resolver_error},
 };
 

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::object::ObjRef;
+use crate::object::LoxObject;
 use crate::token::Token;
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub enum Interruption {
     },
     Break,
     Return {
-        object: ObjRef,
+        object: LoxObject,
     },
 }
 
@@ -99,6 +99,6 @@ pub fn brake_inter() -> Interruption {
     Interruption::Break
 }
 
-pub fn retun_inter(object: ObjRef) -> Interruption {
+pub fn retun_inter(object: LoxObject) -> Interruption {
     Interruption::Return { object }
 }

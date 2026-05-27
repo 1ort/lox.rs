@@ -5,7 +5,7 @@ use crate::{
     ast::Statement,
     environment::{EnvRef, Environment},
     interruption::Interruption,
-    object::ObjRef,
+    object::LoxObject,
 };
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub enum Function {
     Native {
         identifier: String,
         arity: u8,
-        callable: fn(&[ObjRef]) -> Result<ObjRef, Interruption>,
+        callable: fn(&[LoxObject]) -> Result<LoxObject, Interruption>,
     },
     Defined {
         name: String,
@@ -25,12 +25,11 @@ pub enum Function {
 }
 
 impl Function {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &str {
         match self {
             Self::Native { identifier, .. } => identifier,
             Self::Defined { name, .. } => name,
         }
-        .clone()
     }
     pub fn arity(&self) -> u8 {
         match self {
@@ -38,7 +37,7 @@ impl Function {
             Function::Defined { parameters, .. } => parameters.len() as u8,
         }
     }
-    pub fn bind(&self, obj: &ObjRef) -> Self {
+    pub fn bind(&self, obj: LoxObject) -> Self {
         match self {
             Function::Native { .. } => unreachable!(),
             Function::Defined {
@@ -49,7 +48,7 @@ impl Function {
                 is_initializer,
             } => {
                 let mut new_env = Environment::new_local(Rc::clone(closure));
-                new_env.define("this".to_owned(), obj.clone());
+                new_env.define("this".to_owned(), obj);
 
                 Function::Defined {
                     name: name.clone(),

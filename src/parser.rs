@@ -6,7 +6,7 @@ use crate::{
         BinaryOperator, Expression, FunctionStatement, LiteralValue, LogicalOperator, Program,
         Statement, UnaryOperator,
     },
-    interruption::{Interruption, brake_inter, parser_error},
+    interruption::{Interruption, parser_error},
     token::{Token, TokenType},
 };
 
