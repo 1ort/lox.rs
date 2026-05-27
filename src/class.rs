@@ -6,13 +6,19 @@ use crate::{function::Function, interruption::Interruption, object::LoxObject};
 pub struct Class {
     name: String,
     methods: HashMap<String, Rc<Function>>,
+    superclass: Option<Rc<Class>>,
 }
 
 impl Class {
-    pub fn new(name: String, methods: Vec<(String, Rc<Function>)>) -> Self {
+    pub fn new(
+        name: String,
+        methods: Vec<(String, Rc<Function>)>,
+        superclass: Option<Rc<Class>>,
+    ) -> Self {
         Self {
             name,
             methods: HashMap::from_iter(methods),
+            superclass,
         }
     }
 
@@ -24,7 +30,14 @@ impl Class {
     }
 
     pub fn get_method(&self, name: &str) -> Option<Rc<Function>> {
-        self.methods.get(name).cloned()
+        let self_meth = &self.methods.get(name);
+        if self_meth.is_some() {
+            self_meth.cloned()
+        } else {
+            self.superclass
+                .clone()
+                .and_then(|superclass| superclass.get_method(name))
+        }
     }
 
     pub fn get_initializer(&self) -> Option<Rc<Function>> {

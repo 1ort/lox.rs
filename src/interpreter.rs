@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::ast::{
-    BinaryOperator, Expression, FunctionStatement, LiteralValue, LogicalOperator, Program,
-    Statement, UnaryOperator,
+    BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
+    Program, Statement, UnaryOperator,
 };
 use crate::class::{Class, Instance};
 use crate::environment::Environment;
@@ -101,11 +101,23 @@ impl Interpreter {
                 };
                 Err(retun_inter(expr_result))
             }
-            Statement::ClassDeclaration { name, methods } => {
+            Statement::ClassDeclaration {
+                name,
+                superclass,
+                methods,
+            } => {
                 self.environment.define(name.clone(), LoxObject::Nil);
+                let superclass = if let Some(superclass_identifier) = superclass {
+                    let superclass = self.eval_variable(superclass_identifier)?;
+                    match superclass {
+                        LoxObject::Class(class_ref) => Some(class_ref),
+                        _ => return Err(runtime_error("Superclass must be a class.".to_string())),
+                    }
+                } else {
+                    None
+                };
 
                 let closure = self.environment.enter_scope();
-
                 let methods_vec = methods
                     .iter()
                     .map(|meth_stmt| {
@@ -114,7 +126,7 @@ impl Interpreter {
                     })
                     .collect();
 
-                let class = Rc::new(Class::new(name.clone(), methods_vec));
+                let class = Rc::new(Class::new(name.clone(), methods_vec, superclass));
                 self.environment
                     .assign(name.clone(), LoxObject::Class(class))?;
                 Ok(())
@@ -167,15 +179,11 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_binary(left, operator, right),
-            Expression::Identifier {
-                name,
-                resolved_scope_depth,
-            } => self.eval_variable(name, &resolved_scope_depth.borrow()),
+            Expression::Identifier(identifier) => self.eval_variable(identifier),
             Expression::Assignment {
-                name,
+                identifier,
                 expression,
-                resolved_scope_depth,
-            } => self.eval_assignment(name, expression, &resolved_scope_depth.borrow()),
+            } => self.eval_assignment(expression, identifier),
             Expression::Logical {
                 left,
                 operator,
@@ -188,9 +196,8 @@ impl Interpreter {
                 name,
                 expression,
             } => self.eval_set(object, name, expression),
-            Expression::This {
-                resolved_scope_depth,
-            } => self.eval_variable(&"this".to_string(), &resolved_scope_depth.borrow()),
+            Expression::This(identifier) => self.eval_variable(identifier),
+            Expression::Super(identifier) => todo!(),
         }
     }
 
@@ -226,12 +233,13 @@ impl Interpreter {
         }
     }
 
-    fn eval_variable(
-        &mut self,
-        name: &String,
-        scope_depth: &Option<usize>,
-    ) -> Result<LoxObject, Interruption> {
-        let obj_ref = if let Some(distance) = *scope_depth {
+    fn eval_variable(&mut self, identifier: &Identifier) -> Result<LoxObject, Interruption> {
+        let Identifier {
+            resolved_scope_depth,
+            name,
+        } = identifier;
+
+        let obj_ref = if let Some(distance) = *resolved_scope_depth.borrow() {
             self.environment.get_at(distance, name)?
         } else {
             self.globals.get(name)?
@@ -241,12 +249,16 @@ impl Interpreter {
 
     fn eval_assignment(
         &mut self,
-        name: &String,
         expression: &Expression,
-        scope_depth: &Option<usize>,
+        identifier: &Identifier,
     ) -> Result<LoxObject, Interruption> {
+        let Identifier {
+            resolved_scope_depth,
+            name,
+        } = identifier;
+
         let value = self.eval_expression(expression)?;
-        if let Some(distance) = *scope_depth {
+        if let Some(distance) = *resolved_scope_depth.borrow() {
             self.environment.assign_at(distance, name, value.clone())?;
         } else {
             self.globals.assign(name.clone(), value.clone())?

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{Expression, FunctionStatement, Program, Statement},
+    ast::{Expression, FunctionStatement, Identifier, Program, Statement},
     interruption::{Interruption, resolver_error},
 };
 
@@ -73,36 +73,20 @@ impl Resolver {
         }
     }
 
-    fn resolve_local(&mut self, expr: &Expression, name: &str) {
+    fn resolve_local(&mut self, identifier: &Identifier) {
         if let Some(depth) = self
             .scopes
             .iter()
             .rev()
-            .position(|scope| scope.contains_key(name))
+            .position(|scope| scope.contains_key(&identifier.name))
         {
-            self.fill_expression_depth(expr, depth);
+            self.fill_expression_depth(identifier, depth);
         }
     }
 
-    fn fill_expression_depth(&mut self, expr: &Expression, depth: usize) {
-        match expr {
-            Expression::Identifier {
-                resolved_scope_depth,
-                ..
-            }
-            | Expression::This {
-                resolved_scope_depth,
-                ..
-            }
-            | Expression::Assignment {
-                resolved_scope_depth,
-                ..
-            } => {
-                let mut expr_value = resolved_scope_depth.borrow_mut();
-                *expr_value = Some(depth);
-            }
-            _ => (),
-        }
+    fn fill_expression_depth(&mut self, identifier: &Identifier, depth: usize) {
+        let mut expr_value = identifier.resolved_scope_depth.borrow_mut();
+        *expr_value = Some(depth);
     }
 
     pub fn resolve_program(&mut self, program: &Program) -> Result<(), Interruption> {
@@ -169,10 +153,24 @@ impl Resolver {
                 }
             }
             Statement::Break => Ok(()),
-            Statement::ClassDeclaration { name, methods } => {
+            Statement::ClassDeclaration {
+                name,
+                superclass,
+                methods,
+            } => {
                 self.declare(name)?;
                 self.define(name);
+
                 self.begin_scope();
+                if let Some(identifier) = superclass {
+                    if identifier.name.eq(name) {
+                        return Err(resolver_error(
+                            "A class can't inherit from itself.".to_string(),
+                        ));
+                    }
+                    self.resolve_local(identifier);
+                    self.define("super");
+                }
 
                 let enclosing_class_type = self.current_class_type;
                 self.current_class_type = ClassType::Class;
@@ -275,9 +273,9 @@ impl Resolver {
                 self.resolve_expression(object)?;
                 self.resolve_expression(expression)
             }
-            Expression::This { .. } => {
+            Expression::This(identifier) => {
                 if matches!(self.current_class_type, ClassType::Class) {
-                    self.resolve_local(expression, "this");
+                    self.resolve_local(identifier);
                     Ok(())
                 } else {
                     Err(resolver_error(
@@ -285,38 +283,43 @@ impl Resolver {
                     ))
                 }
             }
+            Expression::Super(identifier) => {
+                todo!();
+            }
         }
     }
 
     fn resolve_identifier_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
-        let Expression::Identifier { name, .. } = expr else {
+        let Expression::Identifier(identifier) = expr else {
             unreachable!()
         };
 
         if !self.scopes.is_empty()
             && matches!(
-                self.get_state_in_current_scope(name),
+                self.get_state_in_current_scope(&identifier.name),
                 Some(DeclarationState::Declared)
             )
         {
             return Err(resolver_error(format!(
                 "Can't read local variable in its own initializer: '{}'.",
-                name
+                identifier.name
             )));
         }
 
-        self.resolve_local(expr, name);
+        self.resolve_local(identifier);
         Ok(())
     }
     fn resolve_assignment_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
         let Expression::Assignment {
-            name, expression, ..
+            identifier,
+            expression,
+            ..
         } = expr
         else {
             unreachable!()
         };
         self.resolve_expression(expression)?;
-        self.resolve_local(expr, name);
+        self.resolve_local(identifier);
         Ok(())
     }
 }

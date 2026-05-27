@@ -3,8 +3,8 @@ use std::{cell::RefCell, iter::Peekable};
 
 use crate::{
     ast::{
-        BinaryOperator, Expression, FunctionStatement, LiteralValue, LogicalOperator, Program,
-        Statement, UnaryOperator,
+        BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
+        Program, Statement, UnaryOperator,
     },
     interruption::{Interruption, parser_error},
     token::{Token, TokenType},
@@ -73,6 +73,24 @@ impl<'a> Parser<'a> {
         };
         self.advance();
 
+        let need_superclass = matches!(self.peek().token_type, TokenType::Less);
+        let superclass = if need_superclass {
+            self.advance();
+            let superclass = match &self.peek().token_type {
+                TokenType::Identifier(superclass) => superclass.clone(),
+                _ => {
+                    return Err(parser_error(
+                        self.peek().clone(),
+                        "Expected superclass name.",
+                    ));
+                }
+            };
+            self.advance();
+            Some(Identifier::new(superclass))
+        } else {
+            None
+        };
+
         self.expect_token(TokenType::LeftBrace, "Expect '{' before class body.")?;
 
         let mut methods: Vec<FunctionStatement> = Vec::new();
@@ -89,7 +107,11 @@ impl<'a> Parser<'a> {
 
         self.expect_token(TokenType::RightBrace, "Expect '}' after class body.")?;
 
-        Ok(Statement::ClassDeclaration { name, methods })
+        Ok(Statement::ClassDeclaration {
+            name,
+            superclass,
+            methods,
+        })
     }
 
     fn fun_declaration(&mut self) -> Result<FunctionStatement, Interruption> {
@@ -369,12 +391,11 @@ impl<'a> Parser<'a> {
         if let TokenType::Equal = self.peek().token_type {
             let tok = self.advance();
             match expr {
-                Expression::Identifier { name, .. } => {
+                Expression::Identifier(identifier) => {
                     let value = self.assignment()?;
                     return Ok(Expression::Assignment {
-                        name: name.clone(),
+                        identifier,
                         expression: Box::new(value),
-                        resolved_scope_depth: RefCell::new(None),
                     });
                 }
                 Expression::Get { object, name } => {
@@ -586,7 +607,7 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expression, Interruption> {
-        use Expression::{Identifier, Literal};
+        use Expression::{Identifier, Literal, This};
         use LiteralValue::*;
         let expression = match &self.peek().token_type {
             TokenType::False => Literal {
@@ -602,13 +623,9 @@ impl<'a> Parser<'a> {
             TokenType::String(string) => Literal {
                 value: String(string.clone()),
             },
-            TokenType::Identifier(name) => Identifier {
-                name: name.clone(),
-                resolved_scope_depth: RefCell::new(None),
-            },
-            TokenType::This => Expression::This {
-                resolved_scope_depth: RefCell::new(None),
-            },
+            TokenType::Identifier(name) => Identifier(crate::ast::Identifier::new(name.clone())),
+            TokenType::This => This(crate::ast::Identifier::new("this".to_string())),
+            TokenType::Super => todo!(),
             _ => return self.grouping(),
         };
         self.advance();

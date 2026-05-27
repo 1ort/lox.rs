@@ -1,4 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
+
+use crate::class::Instance;
 
 #[derive(Debug)]
 pub struct Program {
@@ -36,6 +38,7 @@ pub enum Statement {
     },
     ClassDeclaration {
         name: String,
+        superclass: Option<Identifier>,
         methods: Vec<FunctionStatement>,
     },
 }
@@ -48,18 +51,29 @@ pub struct FunctionStatement {
 }
 
 #[derive(Debug, Clone)]
+pub struct Identifier {
+    pub name: String,
+    pub resolved_scope_depth: RefCell<Option<usize>>,
+}
+
+impl Identifier {
+    pub fn new(name: String) -> Self {
+        Identifier {
+            name,
+            resolved_scope_depth: RefCell::new(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     Literal {
         value: LiteralValue,
     },
-    Identifier {
-        name: String,
-        resolved_scope_depth: RefCell<Option<usize>>,
-    },
+    Identifier(Identifier),
     Assignment {
-        name: String,
+        identifier: Identifier,
         expression: Box<Expression>,
-        resolved_scope_depth: RefCell<Option<usize>>,
     },
     Unary {
         operator: UnaryOperator,
@@ -91,9 +105,8 @@ pub enum Expression {
         name: String,
         expression: Box<Expression>,
     },
-    This {
-        resolved_scope_depth: RefCell<Option<usize>>,
-    },
+    This(Identifier),
+    Super(Identifier),
 }
 
 #[derive(Debug, Clone)]
