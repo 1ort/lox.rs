@@ -1,11 +1,8 @@
 use core::fmt;
-use std::{cell::RefCell, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
-    ast::Statement,
-    environment::{EnvRef, Environment},
-    interruption::Interruption,
-    object::LoxObject,
+    ast::Statement, environment::Environment, interruption::Interruption, object::LoxObject,
 };
 
 #[derive(Debug, Clone)]
@@ -19,7 +16,7 @@ pub enum Function {
         name: String,
         parameters: Vec<String>,
         code_block: Rc<Statement>,
-        closure: EnvRef,
+        closure: Environment,
         is_initializer: bool,
     },
 }
@@ -47,14 +44,14 @@ impl Function {
                 closure,
                 is_initializer,
             } => {
-                let mut new_env = Environment::new_local(Rc::clone(closure));
+                let mut new_env = closure.enter_scope();
                 new_env.define("this".to_owned(), obj);
 
                 Function::Defined {
                     name: name.clone(),
                     parameters: parameters.clone(),
                     code_block: code_block.clone(),
-                    closure: Rc::new(RefCell::new(new_env)),
+                    closure: new_env,
                     is_initializer: *is_initializer,
                 }
             }

@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ast::{
@@ -6,7 +5,7 @@ use crate::ast::{
     Statement, UnaryOperator,
 };
 use crate::class::{Class, Instance};
-use crate::environment::{EnvRef, Environment};
+use crate::environment::Environment;
 use crate::function::Function;
 use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
 use crate::object::LoxObject;
@@ -14,16 +13,16 @@ use crate::object::LoxObject;
 use crate::globals;
 
 pub struct Interpreter {
-    pub environment: EnvRef,
-    pub globals: EnvRef,
+    pub environment: Environment,
+    pub globals: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let globals = Rc::new(RefCell::new(globals::build_globals()));
+        let globals = globals::build_globals();
         Interpreter {
-            globals: Rc::clone(&globals),
-            environment: Rc::clone(&globals),
+            globals: globals.clone(),
+            environment: globals.clone(),
         }
     }
 
@@ -59,7 +58,7 @@ impl Interpreter {
                 } else {
                     LoxObject::Nil
                 };
-                self.environment.borrow_mut().define(name.clone(), value);
+                self.environment.define(name.clone(), value);
                 Ok(())
             }
             Statement::Conditional {
@@ -89,11 +88,9 @@ impl Interpreter {
             }
             Statement::Break => Err(brake_inter()),
             Statement::FunctionDeclaration(func_stmt) => {
-                let func =
-                    self.eval_function_statement(func_stmt, Rc::clone(&self.environment), false);
+                let func = self.eval_function_statement(func_stmt, self.environment.clone(), false);
 
                 self.environment
-                    .borrow_mut()
                     .define(func.name().to_owned(), LoxObject::Function(func));
                 Ok(())
             }
@@ -105,26 +102,20 @@ impl Interpreter {
                 Err(retun_inter(expr_result))
             }
             Statement::ClassDeclaration { name, methods } => {
-                self.environment
-                    .borrow_mut()
-                    .define(name.clone(), LoxObject::Nil);
+                self.environment.define(name.clone(), LoxObject::Nil);
 
-                let closure = Rc::new(RefCell::new(Environment::new_local(Rc::clone(
-                    &self.environment,
-                ))));
+                let closure = self.environment.enter_scope();
 
                 let methods_vec = methods
                     .iter()
                     .map(|meth_stmt| {
-                        let method =
-                            self.eval_function_statement(meth_stmt, Rc::clone(&closure), true);
+                        let method = self.eval_function_statement(meth_stmt, closure.clone(), true);
                         (method.name().to_owned(), method)
                     })
                     .collect();
 
                 let class = Rc::new(Class::new(name.clone(), methods_vec));
                 self.environment
-                    .borrow_mut()
                     .assign(name.clone(), LoxObject::Class(class))?;
                 Ok(())
             }
@@ -134,7 +125,7 @@ impl Interpreter {
     fn eval_function_statement(
         &mut self,
         func_stmt: &FunctionStatement,
-        closure: EnvRef,
+        closure: Environment,
         is_method: bool,
     ) -> Rc<Function> {
         let FunctionStatement {
@@ -152,15 +143,14 @@ impl Interpreter {
     }
 
     fn exec_block(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
-        let old_env_ref = Rc::clone(&self.environment);
-        let new_env = Environment::new_local(Rc::clone(&self.environment));
-        self.environment = Rc::new(RefCell::new(new_env));
+        let enclosing = self.environment.clone();
+        self.environment = self.environment.enter_scope();
 
         let res: Result<(), Interruption> = statements
             .iter()
             .try_for_each(|stmt| self.exec_statement(stmt));
 
-        self.environment = old_env_ref;
+        self.environment = enclosing;
         res
     }
 
@@ -242,9 +232,9 @@ impl Interpreter {
         scope_depth: &Option<usize>,
     ) -> Result<LoxObject, Interruption> {
         let obj_ref = if let Some(distance) = *scope_depth {
-            self.environment.borrow().get_at(distance, name)?
+            self.environment.get_at(distance, name)?
         } else {
-            self.globals.borrow().get(name)?
+            self.globals.get(name)?
         };
         Ok(obj_ref)
     }
@@ -257,13 +247,9 @@ impl Interpreter {
     ) -> Result<LoxObject, Interruption> {
         let value = self.eval_expression(expression)?;
         if let Some(distance) = *scope_depth {
-            self.environment
-                .borrow_mut()
-                .assign_at(distance, name, value.clone())?;
+            self.environment.assign_at(distance, name, value.clone())?;
         } else {
-            self.globals
-                .borrow_mut()
-                .assign(name.clone(), value.clone())?
+            self.globals.assign(name.clone(), value.clone())?
         }
         Ok(value)
     }
@@ -413,33 +399,27 @@ impl Interpreter {
         parameters: &[String],
         code_block: &Statement,
         args: &[LoxObject],
-        closure: &EnvRef,
+        closure: &Environment,
         is_initializer: bool,
     ) -> Result<LoxObject, Interruption> {
-        let environment = Environment::new_local(Rc::clone(closure));
-        let old_environment = Rc::clone(&self.environment);
-
-        self.environment = Rc::new(RefCell::new(environment));
+        let enclosing = self.environment.clone();
+        self.environment = closure.enter_scope();
 
         let _ = std::iter::zip(parameters, args)
-            .map(|(name, value)| {
-                self.environment
-                    .borrow_mut()
-                    .define(name.clone(), value.clone())
-            })
+            .map(|(name, value)| self.environment.define(name.clone(), value.clone()))
             .collect::<Vec<_>>();
 
         let result = match self.exec_statement(code_block) {
             Ok(_) => {
                 if is_initializer {
-                    closure.borrow().get_at(0, &"this".to_string())?
+                    closure.get_at(0, &"this".to_string())?
                 } else {
                     LoxObject::Nil
                 }
             }
             Err(Interruption::Return { object }) => {
                 if is_initializer {
-                    closure.borrow().get_at(0, &"this".to_string())?
+                    closure.get_at(0, &"this".to_string())?
                 } else {
                     object
                 }
@@ -447,7 +427,7 @@ impl Interpreter {
             Err(error) => return Err(error),
         };
 
-        self.environment = old_environment;
+        self.environment = enclosing;
         Ok(result)
     }
 }

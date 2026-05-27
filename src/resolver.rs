@@ -49,10 +49,7 @@ impl Resolver {
 
     fn declare(&mut self, name: &str) -> Result<(), Interruption> {
         if matches!(self.get_state_in_current_scope(name), Some(..)) {
-            return Err(resolver_error(format!(
-                "Already a variable with this name in this scope: {}",
-                name
-            )));
+            eprintln!("Already a variable with this name in this scope: {}", name)
         }
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.to_string(), DeclarationState::Declared);
