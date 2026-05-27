@@ -9,8 +9,7 @@ use crate::{
 pub enum Function {
     Native {
         identifier: String,
-        arity: u8,
-        callable: fn(&[LoxObject]) -> Result<LoxObject, Interruption>,
+        callable: fn(Vec<LoxObject>) -> Result<LoxObject, Interruption>,
     },
     Defined {
         name: String,
@@ -30,7 +29,7 @@ impl Function {
     }
     pub fn arity(&self) -> u8 {
         match self {
-            Function::Native { arity, .. } => *arity,
+            Function::Native { .. } => 0,
             Function::Defined { parameters, .. } => parameters.len() as u8,
         }
     }

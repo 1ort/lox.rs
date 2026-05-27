@@ -331,27 +331,26 @@ impl Interpreter {
             .collect::<Result<Vec<LoxObject>, Interruption>>()?;
         match &callee_obj {
             LoxObject::Class(class) => self.instantiate(class, &args),
-            LoxObject::Function(func) => {
-                if func.arity() as usize != args.len() {
-                    return Err(runtime_error(format!(
-                        "{} takes {} arguments, but {} provided",
-                        func,
-                        func.arity(),
-                        args.len()
-                    )));
-                };
-
-                match func.as_ref() {
-                    Function::Native { callable, .. } => Ok(callable(&args)?),
-                    Function::Defined {
-                        parameters,
-                        code_block,
-                        closure,
-                        is_initializer,
-                        ..
-                    } => self.eval_call(parameters, code_block, &args, closure, *is_initializer),
+            LoxObject::Function(func) => match func.as_ref() {
+                Function::Native { callable, .. } => Ok(callable(args)?),
+                Function::Defined {
+                    parameters,
+                    code_block,
+                    closure,
+                    is_initializer,
+                    ..
+                } => {
+                    if parameters.len() != args.len() {
+                        return Err(runtime_error(format!(
+                            "{} takes {} arguments, but {} provided",
+                            func,
+                            parameters.len(),
+                            args.len()
+                        )));
+                    };
+                    self.eval_call(parameters, code_block, &args, closure, *is_initializer)
                 }
-            }
+            },
             _ => Err(runtime_error(format!("'{}' is not callable", callee_obj))),
         }
     }
