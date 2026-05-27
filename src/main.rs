@@ -35,8 +35,8 @@ fn main() {
 fn run_file(lox: &mut Lox, filename: String) {
     let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
     let err = lox.run(&contents);
-    if err.is_some() {
-        process::exit(65);
+    if let Some(err) = err {
+        process::exit(err.exit_code());
     }
 }
 

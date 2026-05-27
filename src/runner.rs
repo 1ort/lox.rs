@@ -16,7 +16,7 @@ impl Lox {
         }
     }
 
-    pub fn run(&mut self, source: &str) -> Option<Box<Interruption>> {
+    pub fn run(&mut self, source: &str) -> Option<Interruption> {
         let tokens = scanner::scan_tokens(source);
         match tokens {
             Ok(tokens) => {
@@ -27,30 +27,30 @@ impl Lox {
                         let mut resolver = Resolver::new();
                         if let Err(error) = resolver.resolve_program(&program) {
                             self.report(&error);
-                            return Some(Box::new(error));
+                            return Some(error);
                         }
 
                         if let Err(error) = self.interpreter.exec(&program) {
                             self.report(&error);
-                            Some(Box::new(error))
+                            Some(error)
                         } else {
                             None
                         }
                     }
                     Err(error) => {
                         self.report(&error);
-                        Some(Box::new(error))
+                        Some(error)
                     }
                 }
             }
             Err(error) => {
                 self.report(&error);
-                Some(Box::new(error))
+                Some(error)
             }
         }
     }
 
     fn report(&mut self, error: impl Error) {
-        println!("{}", error);
+        eprintln!("{}", error);
     }
 }

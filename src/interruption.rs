@@ -58,6 +58,19 @@ impl Display for Interruption {
 
 impl std::error::Error for Interruption {}
 
+impl Interruption {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Interruption::LexerError { .. } => 65,
+            Interruption::ParserError { .. } => 65,
+            Interruption::ResolverError { .. } => 65,
+            Interruption::RuntimeError { .. } => 70,
+            Interruption::Break => 1,
+            Interruption::Return { .. } => 1,
+        }
+    }
+}
+
 pub fn lexer_error(lexeme: String, line: usize, position: usize, message: String) -> Interruption {
     Interruption::LexerError {
         lexeme,
