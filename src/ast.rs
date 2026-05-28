@@ -53,14 +53,14 @@ pub struct FunctionStatement {
 #[derive(Debug, Clone)]
 pub struct Identifier {
     pub name: String,
-    pub resolved_scope_depth: RefCell<Option<usize>>,
+    pub resolved_depth: Option<usize>,
 }
 
 impl Identifier {
     pub fn new(name: String) -> Self {
         Identifier {
             name,
-            resolved_scope_depth: RefCell::new(None),
+            resolved_depth: None,
         }
     }
 }

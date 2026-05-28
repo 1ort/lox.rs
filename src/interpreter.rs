@@ -235,11 +235,11 @@ impl Interpreter {
 
     fn eval_variable(&mut self, identifier: &Identifier) -> Result<LoxObject, Interruption> {
         let Identifier {
-            resolved_scope_depth,
+            resolved_depth,
             name,
         } = identifier;
 
-        let obj_ref = if let Some(distance) = *resolved_scope_depth.borrow() {
+        let obj_ref = if let Some(distance) = *resolved_depth {
             self.environment.get_at(distance, name)?
         } else {
             self.globals.get(name)?
@@ -253,12 +253,12 @@ impl Interpreter {
         identifier: &Identifier,
     ) -> Result<LoxObject, Interruption> {
         let Identifier {
-            resolved_scope_depth,
+            resolved_depth,
             name,
         } = identifier;
 
         let value = self.eval_expression(expression)?;
-        if let Some(distance) = *resolved_scope_depth.borrow() {
+        if let Some(distance) = *resolved_depth {
             self.environment.assign_at(distance, name, value.clone())?;
         } else {
             self.globals.assign(name.clone(), value.clone())?

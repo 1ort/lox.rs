@@ -22,10 +22,10 @@ impl Lox {
             Ok(tokens) => {
                 // println!("{:#?}", tokens);
                 match parse_program(tokens) {
-                    Ok(program) => {
+                    Ok(mut program) => {
                         //println!("{:#?}", program);
                         let mut resolver = Resolver::new();
-                        if let Err(error) = resolver.resolve_program(&program) {
+                        if let Err(error) = resolver.resolve_program(&mut program) {
                             self.report(&error);
                             return Some(error);
                         }

@@ -73,7 +73,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_local(&mut self, identifier: &Identifier) {
+    fn resolve_local(&mut self, identifier: &mut Identifier) {
         if let Some(depth) = self
             .scopes
             .iter()
@@ -84,13 +84,12 @@ impl Resolver {
         }
     }
 
-    fn fill_expression_depth(&mut self, identifier: &Identifier, depth: usize) {
-        let mut expr_value = identifier.resolved_scope_depth.borrow_mut();
-        *expr_value = Some(depth);
+    fn fill_expression_depth(&mut self, identifier: &mut Identifier, depth: usize) {
+        identifier.resolved_depth = Some(depth);
     }
 
-    pub fn resolve_program(&mut self, program: &Program) -> Result<(), Interruption> {
-        let mut iterator = program.statements.iter();
+    pub fn resolve_program(&mut self, program: &mut Program) -> Result<(), Interruption> {
+        let mut iterator = program.statements.iter_mut();
 
         for result in iterator.by_ref().map(|stmt| self.resolve_statement(stmt)) {
             if result.is_err() {
@@ -100,7 +99,7 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_statement(&mut self, stmt: &Statement) -> Result<(), Interruption> {
+    fn resolve_statement(&mut self, stmt: &mut Statement) -> Result<(), Interruption> {
         match stmt {
             Statement::Block { statements } => self.resolve_block_stmt(statements),
             Statement::VarDeclaration { name, initializer } => {
@@ -175,7 +174,7 @@ impl Resolver {
                 let enclosing_class_type = self.current_class_type;
                 self.current_class_type = ClassType::Class;
 
-                methods.iter().try_for_each(|fun_stmt| {
+                methods.iter_mut().try_for_each(|fun_stmt| {
                     let FunctionStatement {
                         parameters,
                         body,
@@ -186,7 +185,7 @@ impl Resolver {
                     self.resolve_function(
                         parameters,
                         body,
-                        if name.eq("init") {
+                        if name.eq(&"init") {
                             FunctionType::Initializer
                         } else {
                             FunctionType::Function
@@ -202,10 +201,10 @@ impl Resolver {
         }
     }
 
-    fn resolve_block_stmt(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
+    fn resolve_block_stmt(&mut self, statements: &mut [Statement]) -> Result<(), Interruption> {
         self.begin_scope();
         let result = statements
-            .iter()
+            .iter_mut()
             .try_for_each(|stmt| self.resolve_statement(stmt));
         self.end_scope();
         result
@@ -214,7 +213,7 @@ impl Resolver {
     fn resolve_function(
         &mut self,
         parameters: &Vec<String>,
-        body: &Statement,
+        body: &mut Statement,
         function_type: FunctionType,
     ) -> Result<(), Interruption> {
         let enclosing_function_type = self.current_function_type;
@@ -235,7 +234,7 @@ impl Resolver {
     fn resolve_var_declaration(
         &mut self,
         name: &str,
-        initializer: &Option<Box<Expression>>,
+        initializer: &mut Option<Box<Expression>>,
     ) -> Result<(), Interruption> {
         self.declare(name)?;
         if let Some(expr) = initializer {
@@ -245,7 +244,7 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_expression(&mut self, expression: &Expression) -> Result<(), Interruption> {
+    fn resolve_expression(&mut self, expression: &mut Expression) -> Result<(), Interruption> {
         match expression {
             Expression::Identifier { .. } => self.resolve_identifier_expression(expression),
             Expression::Assignment { .. } => self.resolve_assignment_expression(expression),
@@ -262,7 +261,7 @@ impl Resolver {
             Expression::Call { callee, arguments } => {
                 self.resolve_expression(callee)?;
                 arguments
-                    .iter()
+                    .iter_mut()
                     .try_for_each(|expr| self.resolve_expression(expr))
             }
             Expression::Literal { .. } => Ok(()),
@@ -289,7 +288,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_identifier_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
+    fn resolve_identifier_expression(&mut self, expr: &mut Expression) -> Result<(), Interruption> {
         let Expression::Identifier(identifier) = expr else {
             unreachable!()
         };
@@ -309,7 +308,7 @@ impl Resolver {
         self.resolve_local(identifier);
         Ok(())
     }
-    fn resolve_assignment_expression(&mut self, expr: &Expression) -> Result<(), Interruption> {
+    fn resolve_assignment_expression(&mut self, expr: &mut Expression) -> Result<(), Interruption> {
         let Expression::Assignment {
             identifier,
             expression,
