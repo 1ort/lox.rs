@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, collections::hash_map::Entry, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, hash_map::Entry},
+    fmt,
+    rc::Rc,
+};
 
 use crate::{
     interruption::{Interruption, runtime_error},
@@ -10,6 +15,7 @@ pub struct Environment(Rc<RefCell<EnvironmentScope>>);
 
 #[derive(Debug, Clone)]
 struct EnvironmentScope {
+    tag: String,
     enclosing: Option<Environment>,
     values: HashMap<String, LoxObject>,
 }
@@ -19,13 +25,15 @@ impl Environment {
         Environment(Rc::new(RefCell::new(EnvironmentScope {
             enclosing: None,
             values: HashMap::new(),
+            tag: "global".to_string(),
         })))
     }
 
-    pub fn enter_scope(&self) -> Self {
+    pub fn enter_scope(&self, tag: String) -> Self {
         Environment(Rc::new(RefCell::new(EnvironmentScope {
             enclosing: Some(self.clone()),
             values: HashMap::new(),
+            tag,
         })))
     }
 
@@ -101,5 +109,30 @@ impl EnvironmentScope {
         } else {
             Err(runtime_error(format!("Undefined variable: {} .", name)))
         }
+    }
+}
+
+impl fmt::Display for Environment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let scope = self.0.borrow();
+        write!(f, "{}", scope)
+    }
+}
+
+impl fmt::Display for EnvironmentScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{{ ", self.tag)?;
+        for (i, (key, value)) in self.values.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", key, value)?;
+        }
+        write!(f, " }}")?;
+
+        if let Some(encl) = &self.enclosing {
+            write!(f, " -> {}", encl)?;
+        }
+        Ok(())
     }
 }

@@ -106,7 +106,10 @@ pub enum Expression {
         expression: Box<Expression>,
     },
     This(Identifier),
-    Super(Identifier),
+    Super {
+        identifier: Identifier,
+        method: String,
+    },
 }
 
 #[derive(Debug, Clone)]

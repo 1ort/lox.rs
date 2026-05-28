@@ -259,6 +259,15 @@ impl Resolver {
             }
             Expression::Grouping { expression } => self.resolve_expression(expression),
             Expression::Call { callee, arguments } => {
+                if let Expression::Identifier(Identifier { name, .. }) = callee.as_ref()
+                    && name.eq("dbgenv")
+                {
+                    println!("{:?}", {
+                        let mut scopes = self.scopes.clone();
+                        scopes.reverse();
+                        scopes
+                    });
+                }
                 self.resolve_expression(callee)?;
                 arguments
                     .iter_mut()
@@ -282,8 +291,9 @@ impl Resolver {
                     ))
                 }
             }
-            Expression::Super(identifier) => {
-                todo!();
+            Expression::Super { identifier, .. } => {
+                self.resolve_local(identifier);
+                Ok(())
             }
         }
     }

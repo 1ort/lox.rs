@@ -625,7 +625,23 @@ impl<'a> Parser<'a> {
             },
             TokenType::Identifier(name) => Identifier(crate::ast::Identifier::new(name.clone())),
             TokenType::This => This(crate::ast::Identifier::new("this".to_string())),
-            TokenType::Super => todo!(),
+            TokenType::Super => {
+                self.advance();
+                self.expect_token(TokenType::Dot, "Expect '.' after 'super'.")?;
+
+                let method = if let TokenType::Identifier(ref name) = self.peek().token_type {
+                    name.clone()
+                } else {
+                    return Err(parser_error(
+                        self.peek().clone(),
+                        "Expected superclass method name.",
+                    ));
+                };
+                Expression::Super {
+                    identifier: crate::ast::Identifier::new("super".to_string()),
+                    method,
+                }
+            }
             _ => return self.grouping(),
         };
         self.advance();

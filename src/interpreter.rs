@@ -117,7 +117,7 @@ impl Interpreter {
                     None
                 };
 
-                let closure = self.environment.enter_scope();
+                let closure = self.environment.enter_scope("class".to_string());
                 let methods_vec = methods
                     .iter()
                     .map(|meth_stmt| {
@@ -156,7 +156,7 @@ impl Interpreter {
 
     fn exec_block(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
         let enclosing = self.environment.clone();
-        self.environment = self.environment.enter_scope();
+        self.environment = self.environment.enter_scope("block".to_string());
 
         let res: Result<(), Interruption> = statements
             .iter()
@@ -197,7 +197,7 @@ impl Interpreter {
                 expression,
             } => self.eval_set(object, name, expression),
             Expression::This(identifier) => self.eval_variable(identifier),
-            Expression::Super(identifier) => todo!(),
+            Expression::Super { identifier, method } => Ok(LoxObject::Nil),
         }
     }
 
@@ -344,7 +344,7 @@ impl Interpreter {
         match &callee_obj {
             LoxObject::Class(class) => self.instantiate(class, &args),
             LoxObject::Function(func) => match func.as_ref() {
-                Function::Native { callable, .. } => Ok(callable(args)?),
+                Function::Native { callable, .. } => Ok(callable(args, &self.environment)?),
                 Function::Defined {
                     parameters,
                     code_block,
@@ -414,7 +414,7 @@ impl Interpreter {
         is_initializer: bool,
     ) -> Result<LoxObject, Interruption> {
         let enclosing = self.environment.clone();
-        self.environment = closure.enter_scope();
+        self.environment = closure.enter_scope("arguments".to_string());
 
         let _ = std::iter::zip(parameters, args)
             .map(|(name, value)| self.environment.define(name.clone(), value.clone()))

@@ -9,7 +9,7 @@ use crate::{
 pub enum Function {
     Native {
         identifier: String,
-        callable: fn(Vec<LoxObject>) -> Result<LoxObject, Interruption>,
+        callable: fn(Vec<LoxObject>, &Environment) -> Result<LoxObject, Interruption>,
     },
     Defined {
         name: String,
@@ -43,7 +43,7 @@ impl Function {
                 closure,
                 is_initializer,
             } => {
-                let mut new_env = closure.enter_scope();
+                let mut new_env = closure.enter_scope("bound".to_string());
                 new_env.define("this".to_owned(), obj);
 
                 Function::Defined {
