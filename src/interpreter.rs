@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::rc::Rc;
 
 use crate::ast::{
@@ -107,21 +108,27 @@ impl Interpreter {
                 methods,
             } => {
                 self.environment.define(name.clone(), LoxObject::Nil);
+                let mut class_scope = self.environment.enter_scope("class".to_string());
+
                 let superclass = if let Some(superclass_identifier) = superclass {
                     let superclass = self.eval_variable(superclass_identifier)?;
                     match superclass {
-                        LoxObject::Class(class_ref) => Some(class_ref),
+                        LoxObject::Class(class_ref) => {
+                            class_scope
+                                .define("super".to_string(), LoxObject::Class(class_ref.clone()));
+                            Some(class_ref)
+                        }
                         _ => return Err(runtime_error("Superclass must be a class.".to_string())),
                     }
                 } else {
                     None
                 };
 
-                let closure = self.environment.enter_scope("class".to_string());
                 let methods_vec = methods
                     .iter()
                     .map(|meth_stmt| {
-                        let method = self.eval_function_statement(meth_stmt, closure.clone(), true);
+                        let method =
+                            self.eval_function_statement(meth_stmt, class_scope.clone(), true);
                         (method.name().to_owned(), method)
                     })
                     .collect();
@@ -151,6 +158,7 @@ impl Interpreter {
             code_block: Rc::new(*body.clone()),
             closure,
             is_initializer: is_method && name.eq("init"),
+            is_bound: false,
         })
     }
 
@@ -197,8 +205,41 @@ impl Interpreter {
                 expression,
             } => self.eval_set(object, name, expression),
             Expression::This(identifier) => self.eval_variable(identifier),
-            Expression::Super { identifier, method } => Ok(LoxObject::Nil),
+            Expression::Super { identifier, method } => self.eval_super_method(identifier, method),
         }
+    }
+
+    fn eval_super_method(
+        &mut self,
+        super_identifier: &Identifier,
+        method_name: &str,
+    ) -> Result<LoxObject, Interruption> {
+        let class_obj = self.eval_variable(super_identifier)?;
+        let method_func = if let LoxObject::Class(class) = class_obj {
+            if let Some(func) = class.get_method(method_name) {
+                func
+            } else {
+                return Err(runtime_error(format!(
+                    "Undefined property '{}'.",
+                    method_name
+                )));
+            }
+        } else {
+            return Err(runtime_error(
+                "Can't resolve 'super': not a class.".to_string(),
+            ));
+        };
+
+        let mut instance_identifier = Identifier::new("this".to_string());
+        instance_identifier.resolved_depth = super_identifier.resolved_depth.map(|x| x - 1);
+        let instance = self.eval_variable(&instance_identifier)?;
+
+        let callable = if method_func.is_bound() {
+            method_func
+        } else {
+            Rc::new(method_func.bind(instance))
+        };
+        Ok(LoxObject::Function(callable))
     }
 
     fn eval_get(&mut self, object: &Expression, name: &String) -> Result<LoxObject, Interruption> {
@@ -210,8 +251,12 @@ impl Interpreter {
         }
         .ok_or(runtime_error(format!("Undefined property '{}'.", name)))?;
         if let LoxObject::Function(function) = attr {
-            let bound_method = function.bind(obj);
-            Ok(LoxObject::Function(Rc::new(bound_method)))
+            let callable = if function.is_bound() {
+                function
+            } else {
+                Rc::new(function.bind(obj))
+            };
+            Ok(LoxObject::Function(callable))
         } else {
             Ok(attr)
         }
@@ -384,8 +429,12 @@ impl Interpreter {
         let object = LoxObject::Instance(instance_rc);
 
         if let Some(initializer) = class.get_initializer() {
-            let bound_method = initializer.bind(object.clone());
-            match bound_method {
+            let callable = if initializer.is_bound() {
+                initializer
+            } else {
+                Rc::new(initializer.bind(object.clone()))
+            };
+            match callable.as_ref() {
                 Function::Defined {
                     parameters,
                     code_block,
@@ -397,7 +446,7 @@ impl Interpreter {
                     &code_block,
                     arguments,
                     &closure,
-                    is_initializer,
+                    *is_initializer,
                 )?,
                 _ => unreachable!(), // only user functions could be initializers
             };

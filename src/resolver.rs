@@ -22,6 +22,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    SubClass,
 }
 
 pub struct Resolver {
@@ -86,6 +87,7 @@ impl Resolver {
 
     fn fill_expression_depth(&mut self, identifier: &mut Identifier, depth: usize) {
         identifier.resolved_depth = Some(depth);
+        //println!("resolved depth for {:?}", identifier);
     }
 
     pub fn resolve_program(&mut self, program: &mut Program) -> Result<(), Interruption> {
@@ -160,7 +162,6 @@ impl Resolver {
                 self.declare(name)?;
                 self.define(name);
 
-                self.begin_scope();
                 if let Some(identifier) = superclass {
                     if identifier.name.eq(name) {
                         return Err(resolver_error(
@@ -168,11 +169,16 @@ impl Resolver {
                         ));
                     }
                     self.resolve_local(identifier);
-                    self.define("super");
                 }
+                self.begin_scope();
 
                 let enclosing_class_type = self.current_class_type;
-                self.current_class_type = ClassType::Class;
+                self.current_class_type = if superclass.is_some() {
+                    self.define("super");
+                    ClassType::SubClass
+                } else {
+                    ClassType::Class
+                };
 
                 methods.iter_mut().try_for_each(|fun_stmt| {
                     let FunctionStatement {
@@ -282,7 +288,7 @@ impl Resolver {
                 self.resolve_expression(expression)
             }
             Expression::This(identifier) => {
-                if matches!(self.current_class_type, ClassType::Class) {
+                if !matches!(self.current_class_type, ClassType::None) {
                     self.resolve_local(identifier);
                     Ok(())
                 } else {
@@ -291,10 +297,18 @@ impl Resolver {
                     ))
                 }
             }
-            Expression::Super { identifier, .. } => {
-                self.resolve_local(identifier);
-                Ok(())
-            }
+            Expression::Super { identifier, .. } => match self.current_class_type {
+                ClassType::None => Err(resolver_error(
+                    "Can't use 'super' outside of a class.".to_string(),
+                )),
+                ClassType::Class => Err(resolver_error(
+                    "Can't use 'super' in a class with no superclass.".to_string(),
+                )),
+                ClassType::SubClass => {
+                    self.resolve_local(identifier);
+                    Ok(())
+                }
+            },
         }
     }
 

@@ -40,8 +40,18 @@ impl Class {
         }
     }
 
+    fn get_superclass_initializer(&self) -> Option<Rc<Function>> {
+        match &self.superclass {
+            Some(superclass) => superclass.get_initializer(),
+            None => None,
+        }
+    }
+
     pub fn get_initializer(&self) -> Option<Rc<Function>> {
-        self.methods.get("init").cloned()
+        self.methods
+            .get("init")
+            .cloned()
+            .or_else(|| self.get_superclass_initializer())
     }
 }
 

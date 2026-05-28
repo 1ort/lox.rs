@@ -17,6 +17,7 @@ pub enum Function {
         code_block: Rc<Statement>,
         closure: Environment,
         is_initializer: bool,
+        is_bound: bool,
     },
 }
 
@@ -33,6 +34,14 @@ impl Function {
             Function::Defined { parameters, .. } => parameters.len() as u8,
         }
     }
+
+    pub fn is_bound(&self) -> bool {
+        match self {
+            Function::Native { .. } => unreachable!(),
+            Function::Defined { is_bound, .. } => *is_bound,
+        }
+    }
+
     pub fn bind(&self, obj: LoxObject) -> Self {
         match self {
             Function::Native { .. } => unreachable!(),
@@ -42,6 +51,7 @@ impl Function {
                 code_block,
                 closure,
                 is_initializer,
+                ..
             } => {
                 let mut new_env = closure.enter_scope("bound".to_string());
                 new_env.define("this".to_owned(), obj);
@@ -52,6 +62,7 @@ impl Function {
                     code_block: code_block.clone(),
                     closure: new_env,
                     is_initializer: *is_initializer,
+                    is_bound: true,
                 }
             }
         }
