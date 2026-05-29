@@ -13,7 +13,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Environment(Rc<RefCell<EnvironmentScope>>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct EnvironmentScope {
     tag: String,
     enclosing: Option<Environment>,
@@ -38,19 +38,41 @@ impl Environment {
     }
 
     pub fn define(&mut self, name: String, value: LoxObject) {
-        self.0.borrow_mut().define(name, value)
+        self.0.borrow_mut().values.insert(name, value);
     }
 
     pub fn get(&self, name: &String) -> Result<LoxObject, Interruption> {
-        self.0.borrow().get(name)
+        if let Some(value) = self.0.borrow().values.get(name) {
+            Ok(value.clone())
+        } else {
+            Err(runtime_error(format!("Undefined variable: {} .", name)))
+        }
     }
 
     pub fn get_at(&self, distance: usize, name: &String) -> Result<LoxObject, Interruption> {
-        self.0.borrow().get_at(distance, name)
+        let scope = &self.0.borrow();
+        if distance == 0
+            && let Some(value) = scope.values.get(name)
+        {
+            Ok(value.clone())
+        } else if let Some(ref enclosing) = scope.enclosing {
+            enclosing.get_at(distance - 1, name)
+        } else {
+            Err(runtime_error(format!("Undefined variable: {} .", name)))
+        }
     }
 
     pub fn assign(&mut self, name: String, value: LoxObject) -> Result<(), Interruption> {
-        self.0.borrow_mut().assign(name, value)
+        match self
+            .0
+            .borrow_mut()
+            .values
+            .entry(name.clone())
+            .and_modify(|x| *x = value)
+        {
+            Entry::Vacant(_) => Err(runtime_error(format!("Undefined variable: {} .", name))),
+            Entry::Occupied(_) => Ok(()),
+        }
     }
 
     pub fn assign_at(
@@ -59,52 +81,11 @@ impl Environment {
         name: &String,
         value: LoxObject,
     ) -> Result<(), Interruption> {
-        self.0.borrow_mut().assign_at(distance, name, value)
-    }
-}
-
-impl EnvironmentScope {
-    fn define(&mut self, name: String, value: LoxObject) {
-        self.values.insert(name, value);
-    }
-
-    fn get(&self, name: &String) -> Result<LoxObject, Interruption> {
-        if let Some(value) = self.values.get(name) {
-            Ok(value.clone())
-        } else {
-            Err(runtime_error(format!("Undefined variable: {} .", name)))
-        }
-    }
-
-    fn get_at(&self, distance: usize, name: &String) -> Result<LoxObject, Interruption> {
-        if distance == 0
-            && let Some(value) = self.values.get(name)
-        {
-            Ok(value.clone())
-        } else if let Some(ref enclosing) = self.enclosing {
-            enclosing.get_at(distance - 1, name)
-        } else {
-            Err(runtime_error(format!("Undefined variable: {} .", name)))
-        }
-    }
-
-    fn assign(&mut self, name: String, value: LoxObject) -> Result<(), Interruption> {
-        match self.values.entry(name.clone()).and_modify(|x| *x = value) {
-            Entry::Vacant(_) => Err(runtime_error(format!("Undefined variable: {} .", name))),
-            Entry::Occupied(_) => Ok(()),
-        }
-    }
-
-    fn assign_at(
-        &mut self,
-        distance: usize,
-        name: &String,
-        value: LoxObject,
-    ) -> Result<(), Interruption> {
-        if distance == 0 && self.values.contains_key(name) {
-            self.values.insert(name.clone(), value);
+        let this = &mut self.0.borrow_mut();
+        if distance == 0 && this.values.contains_key(name) {
+            this.values.insert(name.clone(), value);
             Ok(())
-        } else if let Some(ref mut enclosing) = self.enclosing {
+        } else if let Some(ref mut enclosing) = this.enclosing {
             enclosing.assign_at(distance - 1, name, value)
         } else {
             Err(runtime_error(format!("Undefined variable: {} .", name)))
