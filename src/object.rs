@@ -2,7 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::class::{Class, Instance};
-use crate::function::Function;
+use crate::function::{NativeFunction, UserFunction};
 use crate::interruption::{Interruption, runtime_error};
 
 #[derive(Debug, Clone)]
@@ -11,7 +11,8 @@ pub enum LoxObject {
     String(String),
     Boolean(bool),
     Nil,
-    Function(Rc<Function>),
+    UserFunction(Rc<UserFunction>),
+    NativeFunction(Rc<NativeFunction>),
     Class(Rc<Class>),
     Instance(Rc<Instance>),
 }
@@ -74,7 +75,10 @@ impl LoxObject {
                 }
             }
             (Nil, Nil) => Ok(Boolean(true)),
-            (Function(this), Function(other)) => {
+            (UserFunction(this), UserFunction(other)) => {
+                Ok(Boolean(std::ptr::eq(this.as_ref(), other.as_ref())))
+            }
+            (NativeFunction(this), NativeFunction(other)) => {
                 Ok(Boolean(std::ptr::eq(this.as_ref(), other.as_ref())))
             }
             (Class(this), Class(other)) => Ok(Boolean(std::ptr::eq(this.as_ref(), other.as_ref()))),
@@ -189,7 +193,8 @@ impl std::fmt::Display for LoxObject {
             LoxObject::String(val) => f.write_fmt(format_args!("{}", val)),
             LoxObject::Boolean(val) => f.write_fmt(format_args!("{}", val)),
             LoxObject::Nil => f.write_str("nil"),
-            LoxObject::Function(function) => f.write_fmt(format_args!("{}", function)),
+            LoxObject::UserFunction(function) => f.write_fmt(format_args!("{}", function)),
+            LoxObject::NativeFunction(function) => f.write_fmt(format_args!("{}", function)),
             LoxObject::Class(class) => f.write_fmt(format_args!("{}", class)),
             LoxObject::Instance(instance) => f.write_fmt(format_args!("{}", instance)),
         }

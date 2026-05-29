@@ -1,7 +1,3 @@
-use std::cell::{Ref, RefCell};
-
-use crate::class::Instance;
-
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,

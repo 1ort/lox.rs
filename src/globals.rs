@@ -1,10 +1,9 @@
 use crate::environment::Environment;
-use crate::function::Function;
+use crate::function::NativeFunction;
 use crate::interruption::Interruption;
 use crate::interruption::runtime_error;
 use crate::object::LoxObject;
 
-use std::fmt::format;
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
@@ -57,7 +56,7 @@ fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Int
     Ok(LoxObject::String(res))
 }
 
-fn debug_env(args: Vec<LoxObject>, env: &Environment) -> Result<LoxObject, Interruption> {
+fn debug_env(_args: Vec<LoxObject>, env: &Environment) -> Result<LoxObject, Interruption> {
     Ok(LoxObject::String(format!("{}", env)))
 }
 
@@ -66,29 +65,29 @@ pub fn build_globals() -> Environment {
 
     globals.define(
         "clock".to_string(),
-        LoxObject::Function(Rc::new(Function::Native {
-            identifier: "clock".to_string(),
+        LoxObject::NativeFunction(Rc::new(NativeFunction {
+            name: "clock".to_string(),
             callable: fun_clock,
         })),
     );
     globals.define(
         "sleep".to_string(),
-        LoxObject::Function(Rc::new(Function::Native {
-            identifier: "sleep".to_string(),
+        LoxObject::NativeFunction(Rc::new(NativeFunction {
+            name: "sleep".to_string(),
             callable: fun_sleep,
         })),
     );
     globals.define(
         "concat".to_string(),
-        LoxObject::Function(Rc::new(Function::Native {
-            identifier: "concat".to_string(),
+        LoxObject::NativeFunction(Rc::new(NativeFunction {
+            name: "concat".to_string(),
             callable: fun_concat,
         })),
     );
     globals.define(
         "dbgenv".to_string(),
-        LoxObject::Function(Rc::new(Function::Native {
-            identifier: "dbgenv".to_string(),
+        LoxObject::NativeFunction(Rc::new(NativeFunction {
+            name: "dbgenv".to_string(),
             callable: debug_env,
         })),
     );

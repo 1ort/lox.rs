@@ -1,18 +1,18 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use crate::{function::Function, interruption::Interruption, object::LoxObject};
+use crate::{function::UserFunction, interruption::Interruption, object::LoxObject};
 
 #[derive(Debug)]
 pub struct Class {
     name: String,
-    methods: HashMap<String, Rc<Function>>,
+    methods: HashMap<String, Rc<UserFunction>>,
     superclass: Option<Rc<Class>>,
 }
 
 impl Class {
     pub fn new(
         name: String,
-        methods: Vec<(String, Rc<Function>)>,
+        methods: Vec<(String, Rc<UserFunction>)>,
         superclass: Option<Rc<Class>>,
     ) -> Self {
         Self {
@@ -29,7 +29,7 @@ impl Class {
         }
     }
 
-    pub fn get_method(&self, name: &str) -> Option<Rc<Function>> {
+    pub fn get_method(&self, name: &str) -> Option<Rc<UserFunction>> {
         let self_meth = &self.methods.get(name);
         if self_meth.is_some() {
             self_meth.cloned()
@@ -40,14 +40,14 @@ impl Class {
         }
     }
 
-    fn get_superclass_initializer(&self) -> Option<Rc<Function>> {
+    fn get_superclass_initializer(&self) -> Option<Rc<UserFunction>> {
         match &self.superclass {
             Some(superclass) => superclass.get_initializer(),
             None => None,
         }
     }
 
-    pub fn get_initializer(&self) -> Option<Rc<Function>> {
+    pub fn get_initializer(&self) -> Option<Rc<UserFunction>> {
         self.methods
             .get("init")
             .cloned()
@@ -79,7 +79,7 @@ impl Instance {
         if let Some(ref field) = self.fields.borrow().get(name).cloned() {
             return Some(field.clone());
         }
-        self.class.get_method(name).map(LoxObject::Function)
+        self.class.get_method(name).map(LoxObject::UserFunction)
     }
 
     pub fn set(&self, name: String, value: LoxObject) -> Result<(), Interruption> {

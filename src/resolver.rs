@@ -252,8 +252,11 @@ impl Resolver {
 
     fn resolve_expression(&mut self, expression: &mut Expression) -> Result<(), Interruption> {
         match expression {
-            Expression::Identifier { .. } => self.resolve_identifier_expression(expression),
-            Expression::Assignment { .. } => self.resolve_assignment_expression(expression),
+            Expression::Identifier(identifier) => self.resolve_identifier_expression(identifier),
+            Expression::Assignment {
+                identifier,
+                expression,
+            } => self.resolve_assignment_expression(identifier, expression),
             Expression::Unary { expression, .. } => self.resolve_expression(expression),
             Expression::Binary { left, right, .. } => {
                 self.resolve_expression(left)?;
@@ -312,11 +315,10 @@ impl Resolver {
         }
     }
 
-    fn resolve_identifier_expression(&mut self, expr: &mut Expression) -> Result<(), Interruption> {
-        let Expression::Identifier(identifier) = expr else {
-            unreachable!()
-        };
-
+    fn resolve_identifier_expression(
+        &mut self,
+        identifier: &mut Identifier,
+    ) -> Result<(), Interruption> {
         if !self.scopes.is_empty()
             && matches!(
                 self.get_state_in_current_scope(&identifier.name),
@@ -332,15 +334,11 @@ impl Resolver {
         self.resolve_local(identifier);
         Ok(())
     }
-    fn resolve_assignment_expression(&mut self, expr: &mut Expression) -> Result<(), Interruption> {
-        let Expression::Assignment {
-            identifier,
-            expression,
-            ..
-        } = expr
-        else {
-            unreachable!()
-        };
+    fn resolve_assignment_expression(
+        &mut self,
+        identifier: &mut Identifier,
+        expression: &mut Expression,
+    ) -> Result<(), Interruption> {
         self.resolve_expression(expression)?;
         self.resolve_local(identifier);
         Ok(())

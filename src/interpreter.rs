@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::rc::Rc;
 
 use crate::ast::{
@@ -7,7 +6,7 @@ use crate::ast::{
 };
 use crate::class::{Class, Instance};
 use crate::environment::Environment;
-use crate::function::Function;
+use crate::function::{NativeFunction, UserFunction};
 use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
 use crate::object::LoxObject;
 
@@ -92,7 +91,7 @@ impl Interpreter {
                 let func = self.eval_function_statement(func_stmt, self.environment.clone(), false);
 
                 self.environment
-                    .define(func.name().to_owned(), LoxObject::Function(func));
+                    .define(func.name().to_owned(), LoxObject::UserFunction(func));
                 Ok(())
             }
             Statement::Return { expresstion } => {
@@ -146,13 +145,13 @@ impl Interpreter {
         func_stmt: &FunctionStatement,
         closure: Environment,
         is_method: bool,
-    ) -> Rc<Function> {
+    ) -> Rc<UserFunction> {
         let FunctionStatement {
             name,
             parameters,
             body,
         } = func_stmt;
-        Rc::new(Function::Defined {
+        Rc::new(UserFunction {
             name: name.clone(),
             parameters: parameters.clone(),
             code_block: Rc::new(*body.clone()),
@@ -239,7 +238,7 @@ impl Interpreter {
         } else {
             Rc::new(method_func.bind(instance))
         };
-        Ok(LoxObject::Function(callable))
+        Ok(LoxObject::UserFunction(callable))
     }
 
     fn eval_get(&mut self, object: &Expression, name: &String) -> Result<LoxObject, Interruption> {
@@ -250,13 +249,13 @@ impl Interpreter {
             _ => return Err(runtime_error("Only instances have attributes.".to_string())),
         }
         .ok_or(runtime_error(format!("Undefined property '{}'.", name)))?;
-        if let LoxObject::Function(function) = attr {
+        if let LoxObject::UserFunction(function) = attr {
             let callable = if function.is_bound() {
                 function
             } else {
                 Rc::new(function.bind(obj))
             };
-            Ok(LoxObject::Function(callable))
+            Ok(LoxObject::UserFunction(callable))
         } else {
             Ok(attr)
         }
@@ -388,26 +387,28 @@ impl Interpreter {
             .collect::<Result<Vec<LoxObject>, Interruption>>()?;
         match &callee_obj {
             LoxObject::Class(class) => self.instantiate(class, &args),
-            LoxObject::Function(func) => match func.as_ref() {
-                Function::Native { callable, .. } => Ok(callable(args, &self.environment)?),
-                Function::Defined {
+            LoxObject::NativeFunction(func) => {
+                let NativeFunction { callable, .. } = func.as_ref();
+                Ok(callable(args, &self.environment)?)
+            }
+            LoxObject::UserFunction(func) => {
+                let UserFunction {
                     parameters,
                     code_block,
                     closure,
                     is_initializer,
                     ..
-                } => {
-                    if parameters.len() != args.len() {
-                        return Err(runtime_error(format!(
-                            "{} takes {} arguments, but {} provided",
-                            func,
-                            parameters.len(),
-                            args.len()
-                        )));
-                    };
-                    self.eval_call(parameters, code_block, &args, closure, *is_initializer)
-                }
-            },
+                } = func.as_ref();
+                if parameters.len() != args.len() {
+                    return Err(runtime_error(format!(
+                        "{} takes {} arguments, but {} provided",
+                        func,
+                        parameters.len(),
+                        args.len()
+                    )));
+                };
+                self.eval_call(parameters, code_block, &args, closure, *is_initializer)
+            }
             _ => Err(runtime_error(format!("'{}' is not callable", callee_obj))),
         }
     }
@@ -434,22 +435,14 @@ impl Interpreter {
             } else {
                 Rc::new(initializer.bind(object.clone()))
             };
-            match callable.as_ref() {
-                Function::Defined {
-                    parameters,
-                    code_block,
-                    closure,
-                    is_initializer,
-                    ..
-                } => self.eval_call(
-                    &parameters,
-                    &code_block,
-                    arguments,
-                    &closure,
-                    *is_initializer,
-                )?,
-                _ => unreachable!(), // only user functions could be initializers
-            };
+            let UserFunction {
+                parameters,
+                code_block,
+                closure,
+                is_initializer,
+                ..
+            } = callable.as_ref();
+            self.eval_call(parameters, code_block, arguments, closure, *is_initializer)?;
         }
         Ok(object)
     }
