@@ -10,18 +10,19 @@ use crate::{
     token::{Token, TokenType},
 };
 
+pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Vec<Interruption>> {
+    let tokens_it = tokens.iter().peekable();
+    let parser = Parser::new(tokens_it);
+    parser.program()
+}
+
 type TokensPeekable<'a> = Peekable<Iter<'a, Token>>;
 
 struct Parser<'a> {
     tokens: TokensPeekable<'a>,
     is_inside_loop: bool,
     is_inside_function_body: bool,
-}
-
-pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Interruption> {
-    let tokens_it = tokens.iter().peekable();
-    let mut parser = Parser::new(tokens_it);
-    parser.program()
+    errors: Vec<Interruption>,
 }
 
 impl<'a> Parser<'a> {
@@ -30,20 +31,55 @@ impl<'a> Parser<'a> {
             tokens,
             is_inside_loop: false,
             is_inside_function_body: false,
+            errors: Vec::new(),
         }
     }
 
-    fn program(&mut self) -> Result<Program, Interruption> {
+    fn program(mut self) -> Result<Program, Vec<Interruption>> {
         let mut program = Program {
             statements: Vec::new(),
         };
 
         while !self.is_at_end() {
-            // TODO: synchronize
-            program.statements.push(self.declaration()?);
+            match self.declaration() {
+                Ok(stmt) => program.statements.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
         }
-        Ok(program)
+        if self.errors.is_empty() {
+            Ok(program)
+        } else {
+            Err(self.errors)
+        }
     }
+
+    fn synchronize(&mut self) {
+        while !self.is_at_end() {
+            match self.peek().token_type {
+                TokenType::Semicolon => {
+                    self.advance();
+                    return;
+                }
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => {
+                    return;
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+    }
+
     fn declaration(&mut self) -> Result<Statement, Interruption> {
         match self.peek().token_type {
             TokenType::Fun => {
@@ -102,7 +138,13 @@ impl<'a> Parser<'a> {
             ) {
                 break;
             }
-            methods.push(self.fun_declaration()?);
+            match self.fun_declaration() {
+                Ok(stmt) => methods.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
         }
 
         self.expect_token(TokenType::RightBrace, "Expect '}' after class body.")?;
@@ -235,7 +277,14 @@ impl<'a> Parser<'a> {
             if matches!(self.peek().token_type, TokenType::RightBrace) || self.is_at_end() {
                 break;
             }
-            statements.push(self.declaration()?);
+
+            match self.declaration() {
+                Ok(stmt) => statements.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
         }
 
         self.expect_token(TokenType::RightBrace, "Expected '}' after block.")?;

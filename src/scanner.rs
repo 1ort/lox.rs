@@ -1,20 +1,10 @@
 use std::iter::Peekable;
 use std::str::Chars;
 
-use crate::interruption::{Interruption, lexer_error};
 use crate::span::Span;
 use crate::token::{Token, TokenType};
 
-type Source<'a> = Peekable<Chars<'a>>;
-
-struct Lexer<'a> {
-    source: Source<'a>,
-    line: usize,
-    col: usize,
-    pos: usize,
-}
-
-pub fn scan_tokens(source: &str) -> Result<Vec<Token>, Interruption> {
+pub fn scan_tokens(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut lexer = Lexer {
         source: source.chars().peekable(),
@@ -23,17 +13,26 @@ pub fn scan_tokens(source: &str) -> Result<Vec<Token>, Interruption> {
         pos: 0,
     };
 
-    while let Some(token) = lexer.lex()? {
-        tokens.push(token);
+    loop {
+        let next_token = lexer.lex();
+        if next_token.token_type == TokenType::Eof {
+            tokens.push(next_token);
+            break;
+        } else {
+            tokens.push(next_token);
+        }
     }
 
-    tokens.push(Token {
-        token_type: TokenType::Eof,
-        lexeme: "".to_string(),
-        span: lexer.span(0),
-    });
+    tokens
+}
 
-    Ok(tokens)
+type Source<'a> = Peekable<Chars<'a>>;
+
+struct Lexer<'a> {
+    source: Source<'a>,
+    line: usize,
+    col: usize,
+    pos: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -46,74 +45,74 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
+    fn lex(self: &mut Lexer<'a>) -> Token {
         if let Some(c) = self.peek() {
             if c.is_whitespace() {
                 self.skip_spaces();
                 self.lex()
             } else if c.is_ascii_digit() {
-                Ok(Some(self.lex_number()?))
+                self.lex_number()
             } else if c == &'"' {
-                Ok(Some(self.lex_string()?))
+                self.lex_string()
             } else if c.is_ascii_alphanumeric() || matches!(c, '_') {
-                Ok(Some(self.lex_keyword_or_identifier()))
+                self.lex_keyword_or_identifier()
             } else {
                 self.lex_symbol()
             }
         } else {
-            return Ok(None);
+            Token {
+                token_type: TokenType::Eof,
+                lexeme: String::new(),
+                span: self.span(0),
+            }
         }
     }
 
-    fn lex_number(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
+    fn lex_number(self: &mut Lexer<'a>) -> Token {
         let mut span = self.span(0);
         let mut buff = self.take_till(|c| c.is_ascii_digit());
         if self.peek() == Some(&'.') {
             buff.push(self.next().unwrap());
             let fract = self.take_till(|c| c.is_ascii_digit());
             if fract.is_empty() {
-                return Err(lexer_error(
-                    buff,
-                    span.line,
-                    span.col,
-                    "Invalid number. Fractional part expected.".to_string(),
-                ));
+                span.len = buff.len();
+                return Token {
+                    token_type: TokenType::Unexpected(
+                        "Invalid number. Fractional part expected.".to_string(),
+                    ),
+                    lexeme: buff,
+                    span,
+                };
             }
             buff.push_str(&fract);
         }
 
         span.len = buff.len();
-        Ok(Token {
+        Token {
             token_type: TokenType::Number(buff.parse().unwrap()),
             lexeme: buff,
             span,
-        })
+        }
     }
 
-    fn lex_string(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
+    fn lex_string(self: &mut Lexer<'a>) -> Token {
         let mut span = self.span(0);
         let mut buff = String::new();
         buff.push(self.next().unwrap());
         let content = &self.take_till(|c| c.ne(&'"'));
         buff.push_str(content);
 
-        if let Some(c) = self.next()
-            && c == '"'
-        {
-            buff.push(c);
-            span.len = buff.len();
-            Ok(Token {
-                token_type: TokenType::String(content.clone()),
-                lexeme: buff,
-                span,
-            })
+        let token_type = if self.match_next('"') {
+            buff.push('"');
+            TokenType::String(content.clone())
         } else {
-            Err(lexer_error(
-                format!("\"{content}"),
-                span.line,
-                span.col,
-                "Unterminated string.".to_string(),
-            ))
+            TokenType::Unexpected("expect closing '\"' for string.".to_string())
+        };
+        span.len = buff.len();
+        Token {
+            token_type,
+            lexeme: buff,
+            span,
         }
     }
 
@@ -147,9 +146,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_symbol(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
-        let span = self.span(1);
+    fn lex_symbol(self: &mut Lexer<'a>) -> Token {
+        let mut span = self.span(1);
         let c = self.next().unwrap();
+
+        let mut lexeme = None;
 
         let token_type = match c {
             '(' => TokenType::LeftParen,
@@ -164,6 +165,7 @@ impl<'a> Lexer<'a> {
             '*' => TokenType::Star,
             '=' => {
                 if self.match_next('=') {
+                    lexeme = Some("==");
                     TokenType::EqualEqual
                 } else {
                     TokenType::Equal
@@ -171,6 +173,7 @@ impl<'a> Lexer<'a> {
             }
             '<' => {
                 if self.match_next('=') {
+                    lexeme = Some("<=");
                     TokenType::LessEqual
                 } else {
                     TokenType::Less
@@ -178,6 +181,7 @@ impl<'a> Lexer<'a> {
             }
             '>' => {
                 if self.match_next('=') {
+                    lexeme = Some(">=");
                     TokenType::GreaterEqual
                 } else {
                     TokenType::Greater
@@ -185,6 +189,7 @@ impl<'a> Lexer<'a> {
             }
             '!' => {
                 if self.match_next('=') {
+                    lexeme = Some("!=");
                     TokenType::BangEqual
                 } else {
                     TokenType::Bang
@@ -198,21 +203,20 @@ impl<'a> Lexer<'a> {
                     TokenType::Slash
                 }
             }
-            _ => {
-                return Err(lexer_error(
-                    c.to_string(),
-                    span.line,
-                    span.col,
-                    "Unexpected token".to_string(),
-                ));
-            }
+            _ => TokenType::Unknown,
         };
 
-        Ok(Some(Token {
+        let lexeme = match lexeme {
+            Some(lexeme) => lexeme.to_owned(),
+            None => c.to_string(),
+        };
+        span.len = lexeme.len();
+
+        Token {
             token_type,
-            lexeme: c.to_string(),
+            lexeme,
             span,
-        }))
+        }
     }
 
     fn take_till(self: &mut Lexer<'a>, till: impl Fn(char) -> bool) -> String {

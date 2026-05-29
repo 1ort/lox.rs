@@ -4,42 +4,18 @@ use std::fmt::{Display, Formatter};
 use crate::object::LoxObject;
 use crate::token::Token;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Interruption {
-    LexerError {
-        lexeme: String,
-        line: usize,
-        position: usize,
-        message: String,
-    },
-    ParserError {
-        token: Token,
-        message: String,
-    },
-    ResolverError {
-        message: String,
-    },
-    RuntimeError {
-        message: String,
-    },
+    ParserError { token: Token, message: String },
+    ResolverError { message: String },
+    RuntimeError { message: String },
     Break,
-    Return {
-        object: LoxObject,
-    },
+    Return { object: LoxObject },
 }
 
 impl Display for Interruption {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LexerError {
-                lexeme,
-                line,
-                position,
-                message,
-            } => f.write_fmt(format_args!(
-                "[{}:{}] Lexer error. \"{}\": {}",
-                line, position, lexeme, message
-            )),
             Self::ParserError {
                 token: Token { lexeme, span, .. },
                 message,
@@ -64,22 +40,12 @@ impl std::error::Error for Interruption {}
 impl Interruption {
     pub fn exit_code(&self) -> i32 {
         match self {
-            Interruption::LexerError { .. } => 65,
             Interruption::ParserError { .. } => 65,
             Interruption::ResolverError { .. } => 65,
             Interruption::RuntimeError { .. } => 70,
             Interruption::Break => 1,
             Interruption::Return { .. } => 1,
         }
-    }
-}
-
-pub fn lexer_error(lexeme: String, line: usize, position: usize, message: String) -> Interruption {
-    Interruption::LexerError {
-        lexeme,
-        line,
-        position,
-        message,
     }
 }
 

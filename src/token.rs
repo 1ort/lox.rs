@@ -46,6 +46,8 @@ pub enum TokenType {
     True,
     While,
     Break,
+    Unexpected(String),
+    Unknown,
 }
 
 #[derive(Debug, Clone)]
