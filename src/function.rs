@@ -11,7 +11,7 @@ pub struct NativeFunction {
 
 impl std::fmt::Display for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("function '{}'", self.name))
+        write!(f, "<fn {}>", self.name)
     }
 }
 
@@ -54,6 +54,6 @@ impl UserFunction {
 
 impl std::fmt::Display for UserFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("function '{}'", self.name))
+        write!(f, "<fn {}>", self.name)
     }
 }

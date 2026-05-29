@@ -155,10 +155,9 @@ impl LoxObject {
             (LoxObject::Number(a), LoxObject::String(b)) => {
                 Ok(LoxObject::String(format!("{}{}", a, b)))
             }
-            _ => Err(new_runtime_error(format!(
-                "Can not add {:} + {:}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                "Operands must be two numbers or two strings.".to_string(),
+            )),
         }
     }
 

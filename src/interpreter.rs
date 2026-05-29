@@ -461,10 +461,9 @@ impl Interpreter {
                 };
                 self.eval_call(parameters, code_block, &args, closure, *is_initializer)
             }
-            _ => Err(new_runtime_error(format!(
-                "'{}' is not callable",
-                callee_obj
-            ))),
+            _ => Err(new_runtime_error(
+                "Can only call functions and classes.".to_string(),
+            )),
         }
     }
 

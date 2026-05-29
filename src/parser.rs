@@ -196,7 +196,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        self.expect_token(TokenType::RightParen, "Expect ')' after function params.")?;
+        self.expect_token(TokenType::RightParen, "Expect ')' after parameters.")?;
         self.expect_token(TokenType::LeftBrace, "Expect '{' before function body.")?;
 
         let block = if self.is_inside_function_body {

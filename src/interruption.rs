@@ -17,17 +17,17 @@ impl Display for LoxError {
             LoxError::Runtime { message, span } => {
                 write!(f, "{}", message)?;
                 if let Some(span) = span {
-                    write!(f, "[line {}]", span.line)
+                    write!(f, "[{}]", span.line)
                 } else {
-                    Ok(())
+                    write!(f, "\n[line 0]")
                 }
             }
             LoxError::Resolver { message, span } => {
                 write!(f, "{}", message)?;
                 if let Some(span) = span {
-                    write!(f, "[line {}]", span.line)
+                    write!(f, "\n[line {}]", span.line)
                 } else {
-                    Ok(())
+                    write!(f, "\n[line 0]")
                 }
             }
             LoxError::Syntax {
@@ -39,7 +39,7 @@ impl Display for LoxError {
                         span,
                     },
             } => {
-                write!(f, "[line {}] Error at {}: {}", span.line, lexeme, message)
+                write!(f, "[{}] Error at '{}': {}", span.line, lexeme, message)
             }
         }
     }
