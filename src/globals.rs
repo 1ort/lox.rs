@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Interruption> {
-    if args.len() != 1 {
+    if !args.is_empty() {
         return Err(runtime_error(format!(
             "Function 'clock' takes 0 arguments, but {} provided",
             args.len()
