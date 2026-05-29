@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::class::{Class, Instance};
 use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{LoxError, runtime_error};
+use crate::interruption::{LoxError, new_runtime_error};
 
 #[derive(Debug, Clone)]
 pub enum LoxObject {
@@ -37,7 +37,7 @@ impl LoxObject {
     pub fn neg(&self) -> Result<LoxObject, LoxError> {
         match self {
             LoxObject::Number(num) => Ok(LoxObject::Number(-num)),
-            x => Err(runtime_error(format!(
+            x => Err(new_runtime_error(format!(
                 "Can not apply unary '-': {:?} is not a number.",
                 x
             ))),
@@ -96,7 +96,7 @@ impl LoxObject {
     pub fn gt(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a > b)),
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not compare {:?} > {:?}",
                 self, other
             ))),
@@ -106,7 +106,7 @@ impl LoxObject {
     pub fn ge(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a >= b)),
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not compare {:?} >= {:?}",
                 self, other
             ))),
@@ -116,7 +116,7 @@ impl LoxObject {
     pub fn lt(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a < b)),
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not compare {:?} < {:?}",
                 self, other
             ))),
@@ -126,7 +126,7 @@ impl LoxObject {
     pub fn le(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a <= b)),
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not compare {:?} <= {:?}",
                 self, other
             ))),
@@ -136,7 +136,7 @@ impl LoxObject {
     pub fn sub(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a - b)),
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not substract {:?} - {:?}",
                 self, other
             ))),
@@ -155,7 +155,10 @@ impl LoxObject {
             (LoxObject::Number(a), LoxObject::String(b)) => {
                 Ok(LoxObject::String(format!("{}{}", a, b)))
             }
-            _ => Err(runtime_error(format!("Can not add {:} + {:}", self, other))),
+            _ => Err(new_runtime_error(format!(
+                "Can not add {:} + {:}",
+                self, other
+            ))),
         }
     }
 
@@ -165,10 +168,10 @@ impl LoxObject {
                 if *b != 0.0 {
                     Ok(LoxObject::Number(a / b))
                 } else {
-                    Err(runtime_error("Can not divide by zero".to_string()))
+                    Err(new_runtime_error("Can not divide by zero".to_string()))
                 }
             }
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not divide {:?} / {:?}",
                 self, other
             ))),
@@ -178,7 +181,7 @@ impl LoxObject {
     pub fn mul(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a * b)),
-            _ => Err(runtime_error(format!(
+            _ => Err(new_runtime_error(format!(
                 "Can not multiply {:?} * {:?}",
                 self, other
             ))),

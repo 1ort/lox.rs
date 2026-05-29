@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Identifier, Program, Statement},
-    interruption::{LoxError, resolver_error},
+    interruption::{LoxError, new_resolver_error},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -138,13 +138,13 @@ impl Resolver {
                 expresstion: expression,
             } => {
                 if matches!(self.current_function_type, FunctionType::None) {
-                    Err(resolver_error(
+                    Err(new_resolver_error(
                         "Can't return from top-level code.".to_string(),
                     ))
                 } else if matches!(self.current_function_type, FunctionType::Initializer)
                     && expression.is_some()
                 {
-                    Err(resolver_error(
+                    Err(new_resolver_error(
                         "Can't return value from 'init' method.".to_string(),
                     ))
                 } else if let Some(expr) = expression {
@@ -164,7 +164,7 @@ impl Resolver {
 
                 if let Some(identifier) = superclass {
                     if identifier.name.eq(name) {
-                        return Err(resolver_error(
+                        return Err(new_resolver_error(
                             "A class can't inherit from itself.".to_string(),
                         ));
                     }
@@ -295,16 +295,16 @@ impl Resolver {
                     self.resolve_local(identifier);
                     Ok(())
                 } else {
-                    Err(resolver_error(
+                    Err(new_resolver_error(
                         "Can't use 'this' outside of class method.".to_string(),
                     ))
                 }
             }
             Expression::Super { identifier, .. } => match self.current_class_type {
-                ClassType::None => Err(resolver_error(
+                ClassType::None => Err(new_resolver_error(
                     "Can't use 'super' outside of a class.".to_string(),
                 )),
-                ClassType::Class => Err(resolver_error(
+                ClassType::Class => Err(new_resolver_error(
                     "Can't use 'super' in a class with no superclass.".to_string(),
                 )),
                 ClassType::SubClass => {
@@ -325,7 +325,7 @@ impl Resolver {
                 Some(DeclarationState::Declared)
             )
         {
-            return Err(resolver_error(format!(
+            return Err(new_resolver_error(format!(
                 "Can't read local variable in its own initializer: '{}'.",
                 identifier.name
             )));

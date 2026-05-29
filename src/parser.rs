@@ -6,7 +6,7 @@ use crate::{
         BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
         Program, Statement, UnaryOperator,
     },
-    interruption::{LoxError, parser_error},
+    interruption::{LoxError, new_syntax_error},
     token::{Token, TokenType},
 };
 
@@ -102,9 +102,9 @@ impl<'a> Parser<'a> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
-            return Err(parser_error(
+            return Err(new_syntax_error(
+                "Expected class name after 'class'.".to_owned(),
                 self.peek().clone(),
-                "Expected class name after 'class'.",
             ));
         };
         self.advance();
@@ -115,9 +115,9 @@ impl<'a> Parser<'a> {
             let superclass = match &self.peek().token_type {
                 TokenType::Identifier(superclass) => superclass.clone(),
                 _ => {
-                    return Err(parser_error(
+                    return Err(new_syntax_error(
+                        "Expected superclass name.".to_owned(),
                         self.peek().clone(),
-                        "Expected superclass name.",
                     ));
                 }
             };
@@ -160,7 +160,10 @@ impl<'a> Parser<'a> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
-            return Err(parser_error(self.peek().clone(), "Expected function name."));
+            return Err(new_syntax_error(
+                "Expected function name.".to_owned(),
+                self.peek().clone(),
+            ));
         };
         self.advance();
         self.expect_token(TokenType::LeftParen, "Expected '(' after function name")?;
@@ -169,18 +172,18 @@ impl<'a> Parser<'a> {
         if !matches!(self.peek().token_type, TokenType::RightParen) {
             loop {
                 if parameters.len() >= 255 {
-                    return Err(parser_error(
+                    return Err(new_syntax_error(
+                        "Function can't have more than 255 params.".to_owned(),
                         self.peek().clone(),
-                        "Function can't have more than 255 params.",
                     ));
                 }
 
                 let param = if let TokenType::Identifier(param) = &self.peek().token_type {
                     param.clone()
                 } else {
-                    return Err(parser_error(
+                    return Err(new_syntax_error(
+                        "Expected function parameter to be identifier.".to_owned(),
                         self.peek().clone(),
-                        "Expected function parameter to be identifier.",
                     ));
                 };
                 parameters.push(param);
@@ -216,7 +219,10 @@ impl<'a> Parser<'a> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
-            return Err(parser_error(self.peek().clone(), "Variable name expected."));
+            return Err(new_syntax_error(
+                "Variable name expected.".to_owned(),
+                self.peek().clone(),
+            ));
         };
 
         self.advance();
@@ -260,7 +266,10 @@ impl<'a> Parser<'a> {
                 if self.is_inside_loop {
                     Ok(Statement::Break)
                 } else {
-                    Err(parser_error(tok, "'break' outside of loop body."))
+                    Err(new_syntax_error(
+                        "'break' outside of loop body.".to_owned(),
+                        tok,
+                    ))
                 }
             }
             TokenType::Return => {
@@ -426,7 +435,7 @@ impl<'a> Parser<'a> {
             self.advance();
             Ok(())
         } else {
-            Err(parser_error(self.peek().clone(), error_msg))
+            Err(new_syntax_error(error_msg.to_owned(), self.peek().clone()))
         }
     }
 
@@ -456,7 +465,12 @@ impl<'a> Parser<'a> {
                     });
                 }
 
-                _ => return Err(parser_error(tok.clone(), "Invalid assignment target.")),
+                _ => {
+                    return Err(new_syntax_error(
+                        "Invalid assignment target.".to_owned(),
+                        tok.clone(),
+                    ));
+                }
             }
         }
 
@@ -615,9 +629,9 @@ impl<'a> Parser<'a> {
         let field_name = match &self.peek().token_type {
             TokenType::Identifier(name) => name.clone(),
             _ => {
-                return Err(parser_error(
+                return Err(new_syntax_error(
+                    "Expected field name after '.'".to_owned(),
                     self.peek().clone(),
-                    "Expected field name after '.'",
                 ));
             }
         };
@@ -633,9 +647,9 @@ impl<'a> Parser<'a> {
         if !matches!(self.peek().token_type, TokenType::RightParen) {
             loop {
                 if args.len() >= 255 {
-                    return Err(parser_error(
+                    return Err(new_syntax_error(
+                        "Can't have more than 255 arguments.".to_owned(),
                         self.peek().clone(),
-                        "Can't have more than 255 arguments.",
                     ));
                 }
                 args.push(self.expression()?);
@@ -681,9 +695,9 @@ impl<'a> Parser<'a> {
                 let method = if let TokenType::Identifier(ref name) = self.peek().token_type {
                     name.clone()
                 } else {
-                    return Err(parser_error(
+                    return Err(new_syntax_error(
+                        "Expected superclass method name.".to_owned(),
                         self.peek().clone(),
-                        "Expected superclass method name.",
                     ));
                 };
                 Expression::Super {
@@ -707,7 +721,10 @@ impl<'a> Parser<'a> {
                     expression: Box::new(expr),
                 })
             } else {
-                Err(parser_error(self.peek().clone(), "Expected ')'"))
+                Err(new_syntax_error(
+                    "Expected ')'".to_owned(),
+                    self.peek().clone(),
+                ))
             }
         } else {
             self.fallback()
@@ -716,8 +733,14 @@ impl<'a> Parser<'a> {
 
     fn fallback(&mut self) -> Result<Expression, LoxError> {
         match self.peek().token_type {
-            TokenType::Eof => Err(parser_error(self.peek().clone(), "Unexpected EOF")),
-            _ => Err(parser_error(self.peek().clone(), "Unexpected token")),
+            TokenType::Eof => Err(new_syntax_error(
+                "Unexpected EOF".to_owned(),
+                self.peek().clone(),
+            )),
+            _ => Err(new_syntax_error(
+                "Unexpected token".to_owned(),
+                self.peek().clone(),
+            )),
         }
     }
 

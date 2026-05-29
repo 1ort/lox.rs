@@ -4,6 +4,7 @@ use std::fs;
 use std::io;
 use std::io::Write;
 use std::process;
+use std::process::exit;
 
 mod ast;
 mod class;
@@ -27,21 +28,18 @@ fn main() {
         println!("Usage: lox [script]");
         process::exit(64);
     } else if args.len() == 2 {
-        run_file(&mut lox, args[1].clone());
+        exit(run_file(&mut lox, args[1].clone()))
     } else {
-        run_prompt(&mut lox);
+        exit(run_prompt(&mut lox))
     }
 }
 
-fn run_file(lox: &mut Lox, filename: String) {
+fn run_file(lox: &mut Lox, filename: String) -> i32 {
     let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
-    let err = lox.run(&contents);
-    if let Some(err) = err {
-        process::exit(err.exit_code());
-    }
+    lox.run(&contents)
 }
 
-fn run_prompt(lox: &mut Lox) {
+fn run_prompt(lox: &mut Lox) -> i32 {
     loop {
         let mut line = String::new();
         print!("> ");
@@ -52,4 +50,5 @@ fn run_prompt(lox: &mut Lox) {
         }
         lox.run(line.trim_end());
     }
+    0
 }

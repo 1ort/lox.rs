@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::class::{Class, Instance};
 use crate::environment::Environment;
 use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{LoxError, runtime_error};
+use crate::interruption::{LoxError, new_runtime_error};
 use crate::object::LoxObject;
 
 use crate::globals;
@@ -97,7 +97,7 @@ impl Interpreter {
                     class_scope.define("super".to_string(), LoxObject::Class(class_ref.clone()));
                     Some(class_ref)
                 }
-                _ => return Err(runtime_error("Superclass must be a class.".to_string())),
+                _ => return Err(new_runtime_error("Superclass must be a class.".to_string())),
             }
         } else {
             None
@@ -266,13 +266,13 @@ impl Interpreter {
             if let Some(func) = class.get_method(method_name) {
                 func
             } else {
-                return Err(runtime_error(format!(
+                return Err(new_runtime_error(format!(
                     "Undefined property '{}'.",
                     method_name
                 )));
             }
         } else {
-            return Err(runtime_error(
+            return Err(new_runtime_error(
                 "Can't resolve 'super': not a class.".to_string(),
             ));
         };
@@ -294,9 +294,13 @@ impl Interpreter {
 
         let attr = match &obj {
             LoxObject::Instance(instance) => instance.get(name),
-            _ => return Err(runtime_error("Only instances have attributes.".to_string())),
+            _ => {
+                return Err(new_runtime_error(
+                    "Only instances have attributes.".to_string(),
+                ));
+            }
         }
-        .ok_or(runtime_error(format!("Undefined property '{}'.", name)))?;
+        .ok_or(new_runtime_error(format!("Undefined property '{}'.", name)))?;
         if let LoxObject::UserFunction(function) = attr {
             let callable = if function.is_bound() {
                 function
@@ -321,7 +325,7 @@ impl Interpreter {
             instance.set(name.to_owned(), value_ref.clone())?;
             Ok(value_ref)
         } else {
-            Err(runtime_error("Only instances have fields.".to_string()))
+            Err(new_runtime_error("Only instances have fields.".to_string()))
         }
     }
 
@@ -448,7 +452,7 @@ impl Interpreter {
                     ..
                 } = func.as_ref();
                 if parameters.len() != args.len() {
-                    return Err(runtime_error(format!(
+                    return Err(new_runtime_error(format!(
                         "{} takes {} arguments, but {} provided",
                         func,
                         parameters.len(),
@@ -457,7 +461,10 @@ impl Interpreter {
                 };
                 self.eval_call(parameters, code_block, &args, closure, *is_initializer)
             }
-            _ => Err(runtime_error(format!("'{}' is not callable", callee_obj))),
+            _ => Err(new_runtime_error(format!(
+                "'{}' is not callable",
+                callee_obj
+            ))),
         }
     }
 
@@ -467,7 +474,7 @@ impl Interpreter {
         arguments: &[LoxObject],
     ) -> Result<LoxObject, LoxError> {
         if class.arity() as usize != arguments.len() {
-            return Err(runtime_error(format!(
+            return Err(new_runtime_error(format!(
                 "{} takes {} arguments, but {} provided",
                 class,
                 class.arity(),

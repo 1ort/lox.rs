@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    interruption::{LoxError, runtime_error},
+    interruption::{LoxError, new_runtime_error},
     object::LoxObject,
 };
 
@@ -45,7 +45,7 @@ impl Environment {
         if let Some(value) = self.0.borrow().values.get(name) {
             Ok(value.clone())
         } else {
-            Err(runtime_error(format!("Undefined variable: {} .", name)))
+            Err(new_runtime_error(format!("Undefined variable: {} .", name)))
         }
     }
 
@@ -58,7 +58,7 @@ impl Environment {
         } else if let Some(ref enclosing) = scope.enclosing {
             enclosing.get_at(distance - 1, name)
         } else {
-            Err(runtime_error(format!("Undefined variable: {} .", name)))
+            Err(new_runtime_error(format!("Undefined variable: {} .", name)))
         }
     }
 
@@ -70,7 +70,7 @@ impl Environment {
             .entry(name.clone())
             .and_modify(|x| *x = value)
         {
-            Entry::Vacant(_) => Err(runtime_error(format!("Undefined variable: {} .", name))),
+            Entry::Vacant(_) => Err(new_runtime_error(format!("Undefined variable: {} .", name))),
             Entry::Occupied(_) => Ok(()),
         }
     }
@@ -88,7 +88,7 @@ impl Environment {
         } else if let Some(ref mut enclosing) = this.enclosing {
             enclosing.assign_at(distance - 1, name, value)
         } else {
-            Err(runtime_error(format!("Undefined variable: {} .", name)))
+            Err(new_runtime_error(format!("Undefined variable: {} .", name)))
         }
     }
 }
