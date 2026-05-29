@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::class::{Class, Instance};
 use crate::environment::Environment;
 use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{Interruption, brake_inter, retun_inter, runtime_error};
+use crate::interruption::{Interruption, runtime_error};
 use crate::object::LoxObject;
 
 use crate::globals;
@@ -15,6 +15,12 @@ use crate::globals;
 pub struct Interpreter {
     pub environment: Environment,
     pub globals: Environment,
+}
+
+enum JumpKind {
+    Return(LoxObject),
+    Brake,
+    None,
 }
 
 impl Interpreter {
@@ -37,140 +43,161 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn exec_statement(&mut self, statement: &Statement) -> Result<(), Interruption> {
+    fn exec_statement(&mut self, statement: &Statement) -> Result<JumpKind, Interruption> {
         match statement {
-            Statement::Block { statements } => {
-                self.exec_block(statements)?;
-                Ok(())
-            }
+            Statement::Block { statements } => self.exec_block(statements),
             Statement::Expression { expression } => {
                 self.eval_expression(expression)?;
-                Ok(())
+                Ok(JumpKind::None)
             }
             Statement::Print { expression } => {
                 let obj = self.eval_expression(expression)?;
                 println!("{}", obj);
-                Ok(())
+                Ok(JumpKind::None)
             }
             Statement::VarDeclaration { name, initializer } => {
-                let value = if let Some(expression) = initializer {
-                    self.eval_expression(expression)?
-                } else {
-                    LoxObject::Nil
-                };
-                self.environment.define(name.clone(), value);
-                Ok(())
+                self.exec_var_declaration(name, initializer)
             }
             Statement::Conditional {
                 condition,
                 then_branch,
                 else_branch,
-            } => {
-                if self.eval_expression(condition)?.bool_native() {
-                    self.exec_statement(then_branch)?;
-                } else if let Some(else_branch_unwrapped) = else_branch {
-                    self.exec_statement(else_branch_unwrapped)?;
-                }
-                Ok(())
-            }
-            Statement::WhileLoop { condition, body } => {
-                while self.eval_expression(condition)?.bool_native() {
-                    if let Err(err) = self.exec_statement(body) {
-                        match err {
-                            Interruption::Break => {
-                                break;
-                            }
-                            _ => return Err(err),
-                        }
-                    }
-                }
-                Ok(())
-            }
-            Statement::Break => Err(brake_inter()),
-            Statement::FunctionDeclaration(func_stmt) => {
-                let func = self.eval_function_statement(func_stmt, self.environment.clone(), false);
-
-                self.environment
-                    .define(func.name().to_owned(), LoxObject::UserFunction(func));
-                Ok(())
-            }
+            } => self.exec_conditional(condition, then_branch, else_branch),
+            Statement::WhileLoop { condition, body } => self.exec_while_loop(condition, body),
+            Statement::Break => Ok(JumpKind::Brake),
+            Statement::FunctionDeclaration(func_stmt) => self.exec_function_declaration(func_stmt),
             Statement::Return { expresstion } => {
                 let expr_result = match expresstion {
                     None => LoxObject::Nil,
                     Some(expr) => self.eval_expression(expr)?,
                 };
-                Err(retun_inter(expr_result))
+                Ok(JumpKind::Return(expr_result))
             }
             Statement::ClassDeclaration {
                 name,
                 superclass,
                 methods,
-            } => {
-                self.environment.define(name.clone(), LoxObject::Nil);
-                let mut class_scope = self.environment.enter_scope("class".to_string());
-
-                let superclass = if let Some(superclass_identifier) = superclass {
-                    let superclass = self.eval_variable(superclass_identifier)?;
-                    match superclass {
-                        LoxObject::Class(class_ref) => {
-                            class_scope
-                                .define("super".to_string(), LoxObject::Class(class_ref.clone()));
-                            Some(class_ref)
-                        }
-                        _ => return Err(runtime_error("Superclass must be a class.".to_string())),
-                    }
-                } else {
-                    None
-                };
-
-                let methods_vec = methods
-                    .iter()
-                    .map(|meth_stmt| {
-                        let method =
-                            self.eval_function_statement(meth_stmt, class_scope.clone(), true);
-                        (method.name().to_owned(), method)
-                    })
-                    .collect();
-
-                let class = Rc::new(Class::new(name.clone(), methods_vec, superclass));
-                self.environment
-                    .assign(name.clone(), LoxObject::Class(class))?;
-                Ok(())
-            }
+            } => self.exec_class_declaration(name, superclass, methods),
         }
     }
 
-    fn eval_function_statement(
+    fn exec_class_declaration(
         &mut self,
-        func_stmt: &FunctionStatement,
-        closure: Environment,
-        is_method: bool,
-    ) -> Rc<UserFunction> {
-        let FunctionStatement {
-            name,
-            parameters,
-            body,
-        } = func_stmt;
-        Rc::new(UserFunction {
-            name: name.clone(),
-            parameters: parameters.clone(),
-            code_block: Rc::new(*body.clone()),
-            closure,
-            is_initializer: is_method && name.eq("init"),
-            is_bound: false,
-        })
+        name: &str,
+        superclass: &Option<Identifier>,
+        methods: &[FunctionStatement],
+    ) -> Result<JumpKind, Interruption> {
+        self.environment.define(name.to_owned(), LoxObject::Nil);
+        let mut class_scope = self.environment.enter_scope("class".to_string());
+
+        let superclass = if let Some(superclass_identifier) = superclass {
+            let superclass = self.eval_variable(superclass_identifier)?;
+            match superclass {
+                LoxObject::Class(class_ref) => {
+                    class_scope.define("super".to_string(), LoxObject::Class(class_ref.clone()));
+                    Some(class_ref)
+                }
+                _ => return Err(runtime_error("Superclass must be a class.".to_string())),
+            }
+        } else {
+            None
+        };
+
+        let methods_vec = methods
+            .iter()
+            .map(|meth_stmt| {
+                let method = self.eval_function_statement(meth_stmt, class_scope.clone(), true);
+                (method.name().to_owned(), method)
+            })
+            .collect();
+
+        let class = Rc::new(Class::new(name.to_owned(), methods_vec, superclass));
+        self.environment
+            .assign(name.to_owned(), LoxObject::Class(class))?;
+        Ok(JumpKind::None)
     }
 
-    fn exec_block(&mut self, statements: &[Statement]) -> Result<(), Interruption> {
+    fn exec_function_declaration(
+        &mut self,
+        func_stmt: &FunctionStatement,
+    ) -> Result<JumpKind, Interruption> {
+        let func = self.eval_function_statement(func_stmt, self.environment.clone(), false);
+
+        self.environment
+            .define(func.name().to_owned(), LoxObject::UserFunction(func));
+        Ok(JumpKind::None)
+    }
+
+    fn exec_while_loop(
+        &mut self,
+        condition: &Expression,
+        body: &Statement,
+    ) -> Result<JumpKind, Interruption> {
+        while self.eval_expression(condition)?.bool_native() {
+            let jump_kind = self.exec_statement(body)?;
+            match jump_kind {
+                JumpKind::Brake => return Ok(JumpKind::None),
+                JumpKind::Return(..) => {
+                    return Ok(jump_kind);
+                }
+                JumpKind::None => continue,
+            };
+        }
+        Ok(JumpKind::None)
+    }
+
+    fn exec_conditional(
+        &mut self,
+        condition: &Expression,
+        then_branch: &Statement,
+        else_branch: &Option<Box<Statement>>,
+    ) -> Result<JumpKind, Interruption> {
+        if self.eval_expression(condition)?.bool_native() {
+            let jump_kind = self.exec_statement(then_branch)?;
+            if !matches!(jump_kind, JumpKind::None) {
+                return Ok(jump_kind);
+            }
+        } else if let Some(else_branch_unwrapped) = else_branch {
+            let jump_kind = self.exec_statement(else_branch_unwrapped)?;
+            if !matches!(jump_kind, JumpKind::None) {
+                return Ok(jump_kind);
+            }
+        }
+        Ok(JumpKind::None)
+    }
+
+    fn exec_var_declaration(
+        &mut self,
+        name: &str,
+        initializer: &Option<Box<Expression>>,
+    ) -> Result<JumpKind, Interruption> {
+        let value = if let Some(expression) = initializer {
+            self.eval_expression(expression)?
+        } else {
+            LoxObject::Nil
+        };
+        self.environment.define(name.to_owned(), value);
+        Ok(JumpKind::None)
+    }
+
+    fn exec_block(&mut self, statements: &[Statement]) -> Result<JumpKind, Interruption> {
         let enclosing = self.environment.clone();
         self.environment = self.environment.enter_scope("block".to_string());
 
-        let res: Result<(), Interruption> = statements
-            .iter()
-            .try_for_each(|stmt| self.exec_statement(stmt));
+        let mut block_result = Ok(JumpKind::None);
 
+        for result in statements.iter().map(|stmt| self.exec_statement(stmt)) {
+            let jump_kind = result?;
+            match jump_kind {
+                JumpKind::None => continue,
+                _ => {
+                    block_result = Ok(jump_kind);
+                    break;
+                }
+            }
+        }
         self.environment = enclosing;
-        res
+        block_result
     }
 
     fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, Interruption> {
@@ -206,6 +233,27 @@ impl Interpreter {
             Expression::This(identifier) => self.eval_variable(identifier),
             Expression::Super { identifier, method } => self.eval_super_method(identifier, method),
         }
+    }
+
+    fn eval_function_statement(
+        &mut self,
+        func_stmt: &FunctionStatement,
+        closure: Environment,
+        is_method: bool,
+    ) -> Rc<UserFunction> {
+        let FunctionStatement {
+            name,
+            parameters,
+            body,
+        } = func_stmt;
+        Rc::new(UserFunction {
+            name: name.clone(),
+            parameters: parameters.clone(),
+            code_block: Rc::new(*body.clone()),
+            closure,
+            is_initializer: is_method && name.eq("init"),
+            is_bound: false,
+        })
     }
 
     fn eval_super_method(
@@ -462,22 +510,15 @@ impl Interpreter {
             .map(|(name, value)| self.environment.define(name.clone(), value.clone()))
             .collect::<Vec<_>>();
 
-        let result = match self.exec_statement(code_block) {
-            Ok(_) => {
-                if is_initializer {
-                    closure.get_at(0, &"this".to_string())?
-                } else {
-                    LoxObject::Nil
-                }
-            }
-            Err(Interruption::Return { object }) => {
-                if is_initializer {
-                    closure.get_at(0, &"this".to_string())?
-                } else {
-                    object
-                }
-            }
-            Err(error) => return Err(error),
+        let jump_kind = self.exec_statement(code_block)?;
+        if is_initializer {
+            let result = closure.get_at(0, &"this".to_string())?;
+            self.environment = enclosing;
+            return Ok(result);
+        }
+        let result = match jump_kind {
+            JumpKind::Return(object) => object,
+            _ => LoxObject::Nil,
         };
 
         self.environment = enclosing;
