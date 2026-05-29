@@ -2,60 +2,71 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 use crate::interruption::{Interruption, lexer_error};
+use crate::span::Span;
 use crate::token::{Token, TokenType};
 
 type Source<'a> = Peekable<Chars<'a>>;
 
 struct Lexer<'a> {
     source: Source<'a>,
-    current_line: usize,
-    current_position: usize,
+    line: usize,
+    col: usize,
+    pos: usize,
 }
 
 pub fn scan_tokens(source: &str) -> Result<Vec<Token>, Interruption> {
     let mut tokens = Vec::new();
     let mut lexer = Lexer {
         source: source.chars().peekable(),
-        current_line: 1,
-        current_position: 1,
+        line: 1,
+        col: 1,
+        pos: 0,
     };
 
     while let Some(token) = lexer.lex()? {
         tokens.push(token);
     }
+
     tokens.push(Token {
         token_type: TokenType::Eof,
         lexeme: "".to_string(),
-        line: lexer.current_line,
-        position: lexer.current_position,
+        span: lexer.span(0),
     });
 
     Ok(tokens)
 }
 
 impl<'a> Lexer<'a> {
-    fn lex(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
-        let c = self.peek();
-        if c.is_none() {
-            return Ok(None);
+    fn span(&self, len: usize) -> Span {
+        Span {
+            line: self.line,
+            col: self.col,
+            pos: self.pos,
+            len,
         }
-        let c = c.unwrap();
+    }
 
-        if c.is_whitespace() {
-            self.skip_spaces();
-            self.lex()
-        } else if c.is_ascii_digit() {
-            Ok(Some(self.lex_number()?))
-        } else if c == &'"' {
-            Ok(Some(self.lex_string()?))
-        } else if c.is_ascii_alphanumeric() || matches!(c, '_') {
-            Ok(Some(self.lex_keyword_or_identifier()))
+    fn lex(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
+        if let Some(c) = self.peek() {
+            if c.is_whitespace() {
+                self.skip_spaces();
+                self.lex()
+            } else if c.is_ascii_digit() {
+                Ok(Some(self.lex_number()?))
+            } else if c == &'"' {
+                Ok(Some(self.lex_string()?))
+            } else if c.is_ascii_alphanumeric() || matches!(c, '_') {
+                Ok(Some(self.lex_keyword_or_identifier()))
+            } else {
+                self.lex_symbol()
+            }
         } else {
-            self.lex_symbol()
+            return Ok(None);
         }
     }
 
     fn lex_number(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
+        let mut span = self.span(0);
         let mut buff = self.take_till(|c| c.is_ascii_digit());
         if self.peek() == Some(&'.') {
             buff.push(self.next().unwrap());
@@ -63,46 +74,53 @@ impl<'a> Lexer<'a> {
             if fract.is_empty() {
                 return Err(lexer_error(
                     buff,
-                    self.current_line,
-                    self.current_position,
+                    span.line,
+                    span.col,
                     "Invalid number. Fractional part expected.".to_string(),
                 ));
             }
             buff.push_str(&fract);
         }
 
+        span.len = buff.len();
         Ok(Token {
             token_type: TokenType::Number(buff.parse().unwrap()),
             lexeme: buff,
-            line: self.current_line,
-            position: self.current_position,
+            span,
         })
     }
 
     fn lex_string(self: &mut Lexer<'a>) -> Result<Token, Interruption> {
-        self.next().unwrap();
-        let content = self.take_till(|c| c.ne(&'"'));
+        let mut span = self.span(0);
+        let mut buff = String::new();
+        buff.push(self.next().unwrap());
+        let content = &self.take_till(|c| c.ne(&'"'));
+        buff.push_str(content);
 
-        if let Some('"') = self.next() {
+        if let Some(c) = self.next()
+            && c == '"'
+        {
+            buff.push(c);
+            span.len = buff.len();
             Ok(Token {
                 token_type: TokenType::String(content.clone()),
-                lexeme: format!("\"{content}\""),
-                line: self.current_line,
-                position: self.current_position,
+                lexeme: buff,
+                span,
             })
         } else {
             Err(lexer_error(
                 format!("\"{content}"),
-                self.current_line,
-                self.current_position,
+                span.line,
+                span.col,
                 "Unterminated string.".to_string(),
             ))
         }
     }
 
     fn lex_keyword_or_identifier(self: &mut Lexer<'a>) -> Token {
+        let mut span = self.span(0);
         let buff = self.take_till(|c| c.is_ascii_alphanumeric() || matches!(c, '_'));
-
+        span.len = buff.len();
         Token {
             token_type: match buff.as_str() {
                 "print" => TokenType::Print,
@@ -125,12 +143,12 @@ impl<'a> Lexer<'a> {
                 _ => TokenType::Identifier(buff.clone()),
             },
             lexeme: buff,
-            line: self.current_line,
-            position: self.current_position,
+            span,
         }
     }
 
     fn lex_symbol(self: &mut Lexer<'a>) -> Result<Option<Token>, Interruption> {
+        let span = self.span(1);
         let c = self.next().unwrap();
 
         let token_type = match c {
@@ -183,8 +201,8 @@ impl<'a> Lexer<'a> {
             _ => {
                 return Err(lexer_error(
                     c.to_string(),
-                    self.current_line,
-                    self.current_position,
+                    span.line,
+                    span.col,
                     "Unexpected token".to_string(),
                 ));
             }
@@ -193,8 +211,7 @@ impl<'a> Lexer<'a> {
         Ok(Some(Token {
             token_type,
             lexeme: c.to_string(),
-            line: self.current_line,
-            position: self.current_position,
+            span,
         }))
     }
 
@@ -220,8 +237,9 @@ impl<'a> Lexer<'a> {
                 break;
             }
             if c == &'\n' {
-                self.current_line += 1;
-                self.current_position = 1;
+                self.line += 1;
+                self.col = 1;
+                self.pos += 1;
             }
             self.next();
         }
@@ -229,7 +247,8 @@ impl<'a> Lexer<'a> {
 
     fn next(&mut self) -> Option<char> {
         if let Some(ch) = self.source.next() {
-            self.current_position += 1;
+            self.pos += 1;
+            self.col += 1;
             Some(ch)
         } else {
             None

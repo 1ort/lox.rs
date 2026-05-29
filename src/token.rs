@@ -1,3 +1,5 @@
+use crate::span::Span;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Eof,
@@ -50,6 +52,5 @@ pub enum TokenType {
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
-    pub position: usize,
-    pub line: usize,
+    pub span: Span,
 }

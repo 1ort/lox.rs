@@ -40,9 +40,12 @@ impl Display for Interruption {
                 "[{}:{}] Lexer error. \"{}\": {}",
                 line, position, lexeme, message
             )),
-            Self::ParserError { token, message } => f.write_fmt(format_args!(
+            Self::ParserError {
+                token: Token { lexeme, span, .. },
+                message,
+            } => f.write_fmt(format_args!(
                 "[{}:{}] Parser error. \"{}\": {}",
-                token.line, token.position, token.lexeme, message
+                span.line, span.col, lexeme, message
             )),
             Interruption::ResolverError { message } => {
                 f.write_fmt(format_args!("Resolver error. {}", message))

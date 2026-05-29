@@ -17,6 +17,7 @@ mod parser;
 mod resolver;
 mod runner;
 mod scanner;
+mod span;
 mod token;
 
 fn main() {
