@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::class::{Class, Instance};
 use crate::environment::Environment;
 use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{Interruption, runtime_error};
+use crate::interruption::{LoxError, runtime_error};
 use crate::object::LoxObject;
 
 use crate::globals;
@@ -32,7 +32,7 @@ impl Interpreter {
         }
     }
 
-    pub fn exec(&mut self, program: &Program) -> Result<(), Interruption> {
+    pub fn exec(&mut self, program: &Program) -> Result<(), LoxError> {
         let mut iterator = program.statements.iter();
 
         for result in iterator.by_ref().map(|stmt| self.exec_statement(stmt)) {
@@ -43,7 +43,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn exec_statement(&mut self, statement: &Statement) -> Result<JumpKind, Interruption> {
+    fn exec_statement(&mut self, statement: &Statement) -> Result<JumpKind, LoxError> {
         match statement {
             Statement::Block { statements } => self.exec_block(statements),
             Statement::Expression { expression } => {
@@ -86,7 +86,7 @@ impl Interpreter {
         name: &str,
         superclass: &Option<Identifier>,
         methods: &[FunctionStatement],
-    ) -> Result<JumpKind, Interruption> {
+    ) -> Result<JumpKind, LoxError> {
         self.environment.define(name.to_owned(), LoxObject::Nil);
         let mut class_scope = self.environment.enter_scope("class".to_string());
 
@@ -120,7 +120,7 @@ impl Interpreter {
     fn exec_function_declaration(
         &mut self,
         func_stmt: &FunctionStatement,
-    ) -> Result<JumpKind, Interruption> {
+    ) -> Result<JumpKind, LoxError> {
         let func = self.eval_function_statement(func_stmt, self.environment.clone(), false);
 
         self.environment
@@ -132,7 +132,7 @@ impl Interpreter {
         &mut self,
         condition: &Expression,
         body: &Statement,
-    ) -> Result<JumpKind, Interruption> {
+    ) -> Result<JumpKind, LoxError> {
         while self.eval_expression(condition)?.bool_native() {
             let jump_kind = self.exec_statement(body)?;
             match jump_kind {
@@ -151,7 +151,7 @@ impl Interpreter {
         condition: &Expression,
         then_branch: &Statement,
         else_branch: &Option<Box<Statement>>,
-    ) -> Result<JumpKind, Interruption> {
+    ) -> Result<JumpKind, LoxError> {
         if self.eval_expression(condition)?.bool_native() {
             let jump_kind = self.exec_statement(then_branch)?;
             if !matches!(jump_kind, JumpKind::None) {
@@ -170,7 +170,7 @@ impl Interpreter {
         &mut self,
         name: &str,
         initializer: &Option<Box<Expression>>,
-    ) -> Result<JumpKind, Interruption> {
+    ) -> Result<JumpKind, LoxError> {
         let value = if let Some(expression) = initializer {
             self.eval_expression(expression)?
         } else {
@@ -180,7 +180,7 @@ impl Interpreter {
         Ok(JumpKind::None)
     }
 
-    fn exec_block(&mut self, statements: &[Statement]) -> Result<JumpKind, Interruption> {
+    fn exec_block(&mut self, statements: &[Statement]) -> Result<JumpKind, LoxError> {
         let enclosing = self.environment.clone();
         self.environment = self.environment.enter_scope("block".to_string());
 
@@ -200,7 +200,7 @@ impl Interpreter {
         block_result
     }
 
-    fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, Interruption> {
+    fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, LoxError> {
         match expr {
             Expression::Grouping { expression } => self.eval_expression(expression),
             Expression::Literal { value } => self.eval_literal_value(value),
@@ -260,7 +260,7 @@ impl Interpreter {
         &mut self,
         super_identifier: &Identifier,
         method_name: &str,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let class_obj = self.eval_variable(super_identifier)?;
         let method_func = if let LoxObject::Class(class) = class_obj {
             if let Some(func) = class.get_method(method_name) {
@@ -289,7 +289,7 @@ impl Interpreter {
         Ok(LoxObject::UserFunction(callable))
     }
 
-    fn eval_get(&mut self, object: &Expression, name: &String) -> Result<LoxObject, Interruption> {
+    fn eval_get(&mut self, object: &Expression, name: &String) -> Result<LoxObject, LoxError> {
         let obj = self.eval_expression(object)?;
 
         let attr = match &obj {
@@ -314,7 +314,7 @@ impl Interpreter {
         object: &Expression,
         name: &str,
         expression: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let obj = self.eval_expression(object)?;
         if let LoxObject::Instance(instance) = obj {
             let value_ref = self.eval_expression(expression)?;
@@ -325,7 +325,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_variable(&mut self, identifier: &Identifier) -> Result<LoxObject, Interruption> {
+    fn eval_variable(&mut self, identifier: &Identifier) -> Result<LoxObject, LoxError> {
         let Identifier {
             resolved_depth,
             name,
@@ -343,7 +343,7 @@ impl Interpreter {
         &mut self,
         expression: &Expression,
         identifier: &Identifier,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let Identifier {
             resolved_depth,
             name,
@@ -358,7 +358,7 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<LoxObject, Interruption> {
+    fn eval_literal_value(&mut self, val: &LiteralValue) -> Result<LoxObject, LoxError> {
         Ok(match val {
             LiteralValue::Number(num) => LoxObject::Number(*num),
             LiteralValue::String(s) => LoxObject::String(s.clone()),
@@ -371,7 +371,7 @@ impl Interpreter {
         &mut self,
         operator: &UnaryOperator,
         expression: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let expr_value = self.eval_expression(expression)?;
         match operator {
             UnaryOperator::Minus => expr_value.neg(),
@@ -383,7 +383,7 @@ impl Interpreter {
         left: &Expression,
         operator: &BinaryOperator,
         right: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let left = self.eval_expression(left)?;
         let right = self.eval_expression(right)?;
 
@@ -406,7 +406,7 @@ impl Interpreter {
         left: &Expression,
         operator: &LogicalOperator,
         right: &Expression,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let left_result = self.eval_expression(left)?;
         match operator {
             LogicalOperator::Or => {
@@ -427,12 +427,12 @@ impl Interpreter {
         &mut self,
         callee: &Expression,
         argument_expressions: &[Expression],
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let callee_obj = self.eval_expression(callee)?;
         let args = argument_expressions
             .iter()
             .map(|expr| self.eval_expression(expr))
-            .collect::<Result<Vec<LoxObject>, Interruption>>()?;
+            .collect::<Result<Vec<LoxObject>, LoxError>>()?;
         match &callee_obj {
             LoxObject::Class(class) => self.instantiate(class, &args),
             LoxObject::NativeFunction(func) => {
@@ -465,7 +465,7 @@ impl Interpreter {
         &mut self,
         class: &Rc<Class>,
         arguments: &[LoxObject],
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         if class.arity() as usize != arguments.len() {
             return Err(runtime_error(format!(
                 "{} takes {} arguments, but {} provided",
@@ -502,7 +502,7 @@ impl Interpreter {
         args: &[LoxObject],
         closure: &Environment,
         is_initializer: bool,
-    ) -> Result<LoxObject, Interruption> {
+    ) -> Result<LoxObject, LoxError> {
         let enclosing = self.environment.clone();
         self.environment = closure.enter_scope("arguments".to_string());
 

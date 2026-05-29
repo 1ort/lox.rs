@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use crate::{function::UserFunction, interruption::Interruption, object::LoxObject};
+use crate::{function::UserFunction, interruption::LoxError, object::LoxObject};
 
 #[derive(Debug)]
 pub struct Class {
@@ -82,7 +82,7 @@ impl Instance {
         self.class.get_method(name).map(LoxObject::UserFunction)
     }
 
-    pub fn set(&self, name: String, value: LoxObject) -> Result<(), Interruption> {
+    pub fn set(&self, name: String, value: LoxObject) -> Result<(), LoxError> {
         self.fields.borrow_mut().insert(name, value);
         Ok(())
     }

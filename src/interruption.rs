@@ -4,13 +4,13 @@ use std::fmt::{Display, Formatter};
 use crate::token::Token;
 
 #[derive(Debug, Clone)]
-pub enum Interruption {
+pub enum LoxError {
     ParserError { token: Token, message: String },
     ResolverError { message: String },
     RuntimeError { message: String },
 }
 
-impl Display for Interruption {
+impl Display for LoxError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ParserError {
@@ -20,39 +20,39 @@ impl Display for Interruption {
                 "[{}:{}] Parser error. \"{}\": {}",
                 span.line, span.col, lexeme, message
             )),
-            Interruption::ResolverError { message } => {
+            LoxError::ResolverError { message } => {
                 f.write_fmt(format_args!("Resolver error. {}", message))
             }
-            Interruption::RuntimeError { message } => {
+            LoxError::RuntimeError { message } => {
                 f.write_fmt(format_args!("Runtime error. {}", message))
             }
         }
     }
 }
 
-impl std::error::Error for Interruption {}
+impl std::error::Error for LoxError {}
 
-impl Interruption {
+impl LoxError {
     pub fn exit_code(&self) -> i32 {
         match self {
-            Interruption::ParserError { .. } => 65,
-            Interruption::ResolverError { .. } => 65,
-            Interruption::RuntimeError { .. } => 70,
+            LoxError::ParserError { .. } => 65,
+            LoxError::ResolverError { .. } => 65,
+            LoxError::RuntimeError { .. } => 70,
         }
     }
 }
 
-pub fn parser_error(token: Token, message: &str) -> Interruption {
-    Interruption::ParserError {
+pub fn parser_error(token: Token, message: &str) -> LoxError {
+    LoxError::ParserError {
         token,
         message: message.to_string(),
     }
 }
 
-pub fn resolver_error(message: String) -> Interruption {
-    Interruption::ResolverError { message }
+pub fn resolver_error(message: String) -> LoxError {
+    LoxError::ResolverError { message }
 }
 
-pub fn runtime_error(message: String) -> Interruption {
-    Interruption::RuntimeError { message }
+pub fn runtime_error(message: String) -> LoxError {
+    LoxError::RuntimeError { message }
 }

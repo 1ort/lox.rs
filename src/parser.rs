@@ -6,11 +6,11 @@ use crate::{
         BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
         Program, Statement, UnaryOperator,
     },
-    interruption::{Interruption, parser_error},
+    interruption::{LoxError, parser_error},
     token::{Token, TokenType},
 };
 
-pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Vec<Interruption>> {
+pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Vec<LoxError>> {
     let tokens_it = tokens.iter().peekable();
     let parser = Parser::new(tokens_it);
     parser.program()
@@ -22,7 +22,7 @@ struct Parser<'a> {
     tokens: TokensPeekable<'a>,
     is_inside_loop: bool,
     is_inside_function_body: bool,
-    errors: Vec<Interruption>,
+    errors: Vec<LoxError>,
 }
 
 impl<'a> Parser<'a> {
@@ -35,7 +35,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn program(mut self) -> Result<Program, Vec<Interruption>> {
+    fn program(mut self) -> Result<Program, Vec<LoxError>> {
         let mut program = Program {
             statements: Vec::new(),
         };
@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn declaration(&mut self) -> Result<Statement, Interruption> {
+    fn declaration(&mut self) -> Result<Statement, LoxError> {
         match self.peek().token_type {
             TokenType::Fun => {
                 self.advance();
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn class_declaration(&mut self) -> Result<Statement, Interruption> {
+    fn class_declaration(&mut self) -> Result<Statement, LoxError> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
@@ -156,7 +156,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn fun_declaration(&mut self) -> Result<FunctionStatement, Interruption> {
+    fn fun_declaration(&mut self) -> Result<FunctionStatement, LoxError> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
@@ -212,7 +212,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn var_declaration(&mut self) -> Result<Statement, Interruption> {
+    fn var_declaration(&mut self) -> Result<Statement, LoxError> {
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
@@ -232,7 +232,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::VarDeclaration { name, initializer })
     }
 
-    fn statement(&mut self) -> Result<Statement, Interruption> {
+    fn statement(&mut self) -> Result<Statement, LoxError> {
         match self.peek().token_type {
             TokenType::LeftBrace => {
                 self.advance();
@@ -271,7 +271,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn block_statement(&mut self) -> Result<Statement, Interruption> {
+    fn block_statement(&mut self) -> Result<Statement, LoxError> {
         let mut statements = Vec::new();
         loop {
             if matches!(self.peek().token_type, TokenType::RightBrace) || self.is_at_end() {
@@ -291,7 +291,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::Block { statements })
     }
 
-    fn print_statement(&mut self) -> Result<Statement, Interruption> {
+    fn print_statement(&mut self) -> Result<Statement, LoxError> {
         let expr = self.expression()?;
         self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
         Ok(Statement::Print {
@@ -299,7 +299,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn if_statement(&mut self) -> Result<Statement, Interruption> {
+    fn if_statement(&mut self) -> Result<Statement, LoxError> {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'if'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after if condition.")?;
@@ -319,7 +319,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn while_statement(&mut self) -> Result<Statement, Interruption> {
+    fn while_statement(&mut self) -> Result<Statement, LoxError> {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'while'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after loop condition.")?;
@@ -336,7 +336,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::WhileLoop { condition, body })
     }
 
-    fn for_statement(&mut self) -> Result<Statement, Interruption> {
+    fn for_statement(&mut self) -> Result<Statement, LoxError> {
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'for'.")?;
         let maybe_initializer = match self.peek().token_type {
             TokenType::Semicolon => {
@@ -396,7 +396,7 @@ impl<'a> Parser<'a> {
         Ok(statement)
     }
 
-    fn return_statement(&mut self) -> Result<Statement, Interruption> {
+    fn return_statement(&mut self) -> Result<Statement, LoxError> {
         match self.peek().token_type {
             TokenType::Semicolon => {
                 self.advance();
@@ -412,7 +412,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression_statement(&mut self) -> Result<Statement, Interruption> {
+    fn expression_statement(&mut self) -> Result<Statement, LoxError> {
         let expr = self.expression()?;
 
         self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
@@ -421,7 +421,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> Result<(), Interruption> {
+    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> Result<(), LoxError> {
         if self.peek().token_type == expected {
             self.advance();
             Ok(())
@@ -430,11 +430,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression(&mut self) -> Result<Expression, Interruption> {
+    fn expression(&mut self) -> Result<Expression, LoxError> {
         self.assignment()
     }
 
-    fn assignment(&mut self) -> Result<Expression, Interruption> {
+    fn assignment(&mut self) -> Result<Expression, LoxError> {
         let expr = self.or()?;
 
         if let TokenType::Equal = self.peek().token_type {
@@ -463,7 +463,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn or(&mut self) -> Result<Expression, Interruption> {
+    fn or(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.and()?;
 
         loop {
@@ -482,7 +482,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn and(&mut self) -> Result<Expression, Interruption> {
+    fn and(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.equality()?;
 
         loop {
@@ -501,7 +501,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn equality(&mut self) -> Result<Expression, Interruption> {
+    fn equality(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.comparison()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -520,7 +520,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expression, Interruption> {
+    fn comparison(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.term()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -541,7 +541,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expression, Interruption> {
+    fn term(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.factor()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -560,7 +560,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expression, Interruption> {
+    fn factor(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.unary()?;
         loop {
             let binary_operator = match self.peek().token_type {
@@ -579,7 +579,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expression, Interruption> {
+    fn unary(&mut self) -> Result<Expression, LoxError> {
         let unary_operator = match self.peek().token_type {
             TokenType::Bang => UnaryOperator::Bang,
             TokenType::Minus => UnaryOperator::Minus,
@@ -593,7 +593,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn call(&mut self) -> Result<Expression, Interruption> {
+    fn call(&mut self) -> Result<Expression, LoxError> {
         let mut expr = self.primary()?;
         loop {
             expr = match self.peek().token_type {
@@ -611,7 +611,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn finish_get(&mut self, object: Box<Expression>) -> Result<Expression, Interruption> {
+    fn finish_get(&mut self, object: Box<Expression>) -> Result<Expression, LoxError> {
         let field_name = match &self.peek().token_type {
             TokenType::Identifier(name) => name.clone(),
             _ => {
@@ -628,7 +628,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn finish_call(&mut self, callee: Box<Expression>) -> Result<Expression, Interruption> {
+    fn finish_call(&mut self, callee: Box<Expression>) -> Result<Expression, LoxError> {
         let mut args = Vec::new();
         if !matches!(self.peek().token_type, TokenType::RightParen) {
             loop {
@@ -655,7 +655,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn primary(&mut self) -> Result<Expression, Interruption> {
+    fn primary(&mut self) -> Result<Expression, LoxError> {
         use Expression::{Identifier, Literal, This};
         use LiteralValue::*;
         let expression = match &self.peek().token_type {
@@ -697,7 +697,7 @@ impl<'a> Parser<'a> {
         Ok(expression)
     }
 
-    fn grouping(&mut self) -> Result<Expression, Interruption> {
+    fn grouping(&mut self) -> Result<Expression, LoxError> {
         if matches!(self.peek().token_type, TokenType::LeftParen) {
             self.advance();
             let expr = self.expression()?;
@@ -714,7 +714,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn fallback(&mut self) -> Result<Expression, Interruption> {
+    fn fallback(&mut self) -> Result<Expression, LoxError> {
         match self.peek().token_type {
             TokenType::Eof => Err(parser_error(self.peek().clone(), "Unexpected EOF")),
             _ => Err(parser_error(self.peek().clone(), "Unexpected token")),

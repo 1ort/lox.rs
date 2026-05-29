@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use crate::{
-    interpreter::Interpreter, interruption::Interruption, parser::parse_program,
-    resolver::Resolver, scanner::scan_tokens,
+    interpreter::Interpreter, interruption::LoxError, parser::parse_program, resolver::Resolver,
+    scanner::scan_tokens,
 };
 
 pub struct Lox {
@@ -16,7 +16,7 @@ impl Lox {
         }
     }
 
-    pub fn run(&mut self, source: &str) -> Option<Interruption> {
+    pub fn run(&mut self, source: &str) -> Option<LoxError> {
         let tokens = scan_tokens(source);
         // println!("{:#?}", tokens);
         match parse_program(tokens) {

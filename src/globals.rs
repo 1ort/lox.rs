@@ -1,6 +1,6 @@
 use crate::environment::Environment;
 use crate::function::NativeFunction;
-use crate::interruption::Interruption;
+use crate::interruption::LoxError;
 use crate::interruption::runtime_error;
 use crate::object::LoxObject;
 
@@ -9,7 +9,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Interruption> {
+fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if !args.is_empty() {
         return Err(runtime_error(format!(
             "Function 'clock' takes 0 arguments, but {} provided",
@@ -23,7 +23,7 @@ fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Inte
         .as_millis() as f64;
     Ok(LoxObject::Number(millis))
 }
-fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Interruption> {
+fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if args.len() != 1 {
         return Err(runtime_error(format!(
             "Function 'sleep' takes 1 arguments, but {} provided",
@@ -43,7 +43,7 @@ fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Inte
         ))),
     }
 }
-fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Interruption> {
+fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if args.is_empty() {
         return Err(runtime_error(
             "Function 'concat' takes at least 1 arguments, but 0 provided".to_string(),
@@ -56,7 +56,7 @@ fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Int
     Ok(LoxObject::String(res))
 }
 
-fn debug_env(_args: Vec<LoxObject>, env: &Environment) -> Result<LoxObject, Interruption> {
+fn debug_env(_args: Vec<LoxObject>, env: &Environment) -> Result<LoxObject, LoxError> {
     Ok(LoxObject::String(format!("{}", env)))
 }
 

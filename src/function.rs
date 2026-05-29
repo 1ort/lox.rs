@@ -1,14 +1,12 @@
 use core::fmt;
 use std::rc::Rc;
 
-use crate::{
-    ast::Statement, environment::Environment, interruption::Interruption, object::LoxObject,
-};
+use crate::{ast::Statement, environment::Environment, interruption::LoxError, object::LoxObject};
 
 #[derive(Debug)]
 pub struct NativeFunction {
     pub name: String,
-    pub callable: fn(Vec<LoxObject>, &Environment) -> Result<LoxObject, Interruption>,
+    pub callable: fn(Vec<LoxObject>, &Environment) -> Result<LoxObject, LoxError>,
 }
 
 impl std::fmt::Display for NativeFunction {

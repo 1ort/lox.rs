@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Identifier, Program, Statement},
-    interruption::{Interruption, resolver_error},
+    interruption::{LoxError, resolver_error},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -48,7 +48,7 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &str) -> Result<(), Interruption> {
+    fn declare(&mut self, name: &str) -> Result<(), LoxError> {
         if matches!(self.get_state_in_current_scope(name), Some(..)) {
             eprintln!("Already a variable with this name in this scope: {}", name)
         }
@@ -90,7 +90,7 @@ impl Resolver {
         //println!("resolved depth for {:?}", identifier);
     }
 
-    pub fn resolve_program(&mut self, program: &mut Program) -> Result<(), Interruption> {
+    pub fn resolve_program(&mut self, program: &mut Program) -> Result<(), LoxError> {
         let mut iterator = program.statements.iter_mut();
 
         for result in iterator.by_ref().map(|stmt| self.resolve_statement(stmt)) {
@@ -101,7 +101,7 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_statement(&mut self, stmt: &mut Statement) -> Result<(), Interruption> {
+    fn resolve_statement(&mut self, stmt: &mut Statement) -> Result<(), LoxError> {
         match stmt {
             Statement::Block { statements } => self.resolve_block_stmt(statements),
             Statement::VarDeclaration { name, initializer } => {
@@ -207,7 +207,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_block_stmt(&mut self, statements: &mut [Statement]) -> Result<(), Interruption> {
+    fn resolve_block_stmt(&mut self, statements: &mut [Statement]) -> Result<(), LoxError> {
         self.begin_scope();
         let result = statements
             .iter_mut()
@@ -221,7 +221,7 @@ impl Resolver {
         parameters: &Vec<String>,
         body: &mut Statement,
         function_type: FunctionType,
-    ) -> Result<(), Interruption> {
+    ) -> Result<(), LoxError> {
         let enclosing_function_type = self.current_function_type;
         self.current_function_type = function_type;
 
@@ -241,7 +241,7 @@ impl Resolver {
         &mut self,
         name: &str,
         initializer: &mut Option<Box<Expression>>,
-    ) -> Result<(), Interruption> {
+    ) -> Result<(), LoxError> {
         self.declare(name)?;
         if let Some(expr) = initializer {
             self.resolve_expression(expr)?;
@@ -250,7 +250,7 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_expression(&mut self, expression: &mut Expression) -> Result<(), Interruption> {
+    fn resolve_expression(&mut self, expression: &mut Expression) -> Result<(), LoxError> {
         match expression {
             Expression::Identifier(identifier) => self.resolve_identifier_expression(identifier),
             Expression::Assignment {
@@ -318,7 +318,7 @@ impl Resolver {
     fn resolve_identifier_expression(
         &mut self,
         identifier: &mut Identifier,
-    ) -> Result<(), Interruption> {
+    ) -> Result<(), LoxError> {
         if !self.scopes.is_empty()
             && matches!(
                 self.get_state_in_current_scope(&identifier.name),
@@ -338,7 +338,7 @@ impl Resolver {
         &mut self,
         identifier: &mut Identifier,
         expression: &mut Expression,
-    ) -> Result<(), Interruption> {
+    ) -> Result<(), LoxError> {
         self.resolve_expression(expression)?;
         self.resolve_local(identifier);
         Ok(())

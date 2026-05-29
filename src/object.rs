@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::class::{Class, Instance};
 use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{Interruption, runtime_error};
+use crate::interruption::{LoxError, runtime_error};
 
 #[derive(Debug, Clone)]
 pub enum LoxObject {
@@ -25,7 +25,7 @@ impl LoxObject {
         }
     }
 
-    pub fn bool(&self) -> Result<LoxObject, Interruption> {
+    pub fn bool(&self) -> Result<LoxObject, LoxError> {
         match self {
             LoxObject::Boolean(b) => Ok(LoxObject::Boolean(*b)),
             LoxObject::Nil => Ok(LoxObject::Boolean(false)),
@@ -34,7 +34,7 @@ impl LoxObject {
     }
 
     // -x
-    pub fn neg(&self) -> Result<LoxObject, Interruption> {
+    pub fn neg(&self) -> Result<LoxObject, LoxError> {
         match self {
             LoxObject::Number(num) => Ok(LoxObject::Number(-num)),
             x => Err(runtime_error(format!(
@@ -45,12 +45,12 @@ impl LoxObject {
     }
 
     // !x
-    pub fn not(&self) -> Result<LoxObject, Interruption> {
+    pub fn not(&self) -> Result<LoxObject, LoxError> {
         Ok(LoxObject::Boolean(!self.bool_native()))
     }
 
     // ==
-    pub fn eq(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn eq(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         use LoxObject::*;
         match (self, other) {
             (Number(x), Number(y)) => {
@@ -89,11 +89,11 @@ impl LoxObject {
         }
     }
 
-    pub fn neq(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn neq(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         self.eq(other)?.not()
     }
 
-    pub fn gt(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn gt(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a > b)),
             _ => Err(runtime_error(format!(
@@ -103,7 +103,7 @@ impl LoxObject {
         }
     }
 
-    pub fn ge(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn ge(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a >= b)),
             _ => Err(runtime_error(format!(
@@ -113,7 +113,7 @@ impl LoxObject {
         }
     }
 
-    pub fn lt(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn lt(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a < b)),
             _ => Err(runtime_error(format!(
@@ -123,7 +123,7 @@ impl LoxObject {
         }
     }
 
-    pub fn le(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn le(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a <= b)),
             _ => Err(runtime_error(format!(
@@ -133,7 +133,7 @@ impl LoxObject {
         }
     }
 
-    pub fn sub(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn sub(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a - b)),
             _ => Err(runtime_error(format!(
@@ -143,7 +143,7 @@ impl LoxObject {
         }
     }
 
-    pub fn add(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn add(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a + b)),
             (LoxObject::String(a), LoxObject::String(b)) => {
@@ -159,7 +159,7 @@ impl LoxObject {
         }
     }
 
-    pub fn div(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn div(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => {
                 if *b != 0.0 {
@@ -175,7 +175,7 @@ impl LoxObject {
         }
     }
 
-    pub fn mul(&self, other: &LoxObject) -> Result<LoxObject, Interruption> {
+    pub fn mul(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a * b)),
             _ => Err(runtime_error(format!(
