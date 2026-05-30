@@ -11,10 +11,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if !args.is_empty() {
-        return Err(new_runtime_error(format!(
-            "Function 'clock' takes 0 arguments, but {} provided",
-            args.len()
-        )));
+        return Err(new_runtime_error(
+            format!(
+                "Function 'clock' takes 0 arguments, but {} provided",
+                args.len()
+            ),
+            None,
+        ));
     }
     let start = SystemTime::now();
     let millis = start
@@ -25,10 +28,13 @@ fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxE
 }
 fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if args.len() != 1 {
-        return Err(new_runtime_error(format!(
-            "Function 'sleep' takes 1 arguments, but {} provided",
-            args.len()
-        )));
+        return Err(new_runtime_error(
+            format!(
+                "Function 'sleep' takes 1 arguments, but {} provided",
+                args.len()
+            ),
+            None,
+        ));
     }
 
     let duration = args[0].clone();
@@ -37,16 +43,20 @@ fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxE
             thread::sleep(Duration::from_secs_f64(secs));
             Ok(LoxObject::Nil)
         }
-        _ => Err(new_runtime_error(format!(
-            "Function 'sleep' expects number, but '{}' was provided.",
-            duration
-        ))),
+        _ => Err(new_runtime_error(
+            format!(
+                "Function 'sleep' expects number, but '{}' was provided.",
+                duration
+            ),
+            None,
+        )),
     }
 }
 fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if args.is_empty() {
         return Err(new_runtime_error(
             "Function 'concat' takes at least 1 arguments, but 0 provided".to_string(),
+            None,
         ));
     }
 

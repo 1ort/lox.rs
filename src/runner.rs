@@ -29,9 +29,9 @@ impl Lox {
 
                 if let Err(error) = self.interpreter.exec(&program) {
                     self.report(&error);
-                    return 70;
+                    70
                 } else {
-                    return 0;
+                    0
                 }
             }
             Err(errors) => {

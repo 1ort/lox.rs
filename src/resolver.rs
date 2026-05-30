@@ -103,25 +103,31 @@ impl Resolver {
 
     fn resolve_statement(&mut self, stmt: &mut Statement) -> Result<(), LoxError> {
         match stmt {
-            Statement::Block { statements } => self.resolve_block_stmt(statements),
-            Statement::VarDeclaration { name, initializer } => {
-                self.resolve_var_declaration(name, initializer)
-            }
-            Statement::FunctionDeclaration(FunctionStatement {
-                name,
-                parameters,
-                body,
-            }) => {
+            Statement::Block { statements, .. } => self.resolve_block_stmt(statements),
+            Statement::VarDeclaration {
+                name, initializer, ..
+            } => self.resolve_var_declaration(name, initializer),
+            Statement::FunctionDeclaration {
+                function:
+                    FunctionStatement {
+                        name,
+                        parameters,
+                        body,
+                        ..
+                    },
+                ..
+            } => {
                 self.declare(name)?;
                 self.define(name);
                 self.resolve_function(parameters, body, FunctionType::Function)
             }
-            Statement::Expression { expression } => self.resolve_expression(expression),
-            Statement::Print { expression } => self.resolve_expression(expression),
+            Statement::Expression { expression, .. } => self.resolve_expression(expression),
+            Statement::Print { expression, .. } => self.resolve_expression(expression),
             Statement::Conditional {
                 condition,
                 then_branch,
                 else_branch,
+                ..
             } => {
                 self.resolve_expression(condition)?;
                 self.resolve_statement(then_branch)?;
@@ -130,22 +136,27 @@ impl Resolver {
                 }
                 Ok(())
             }
-            Statement::WhileLoop { condition, body } => {
+            Statement::WhileLoop {
+                condition, body, ..
+            } => {
                 self.resolve_expression(condition)?;
                 self.resolve_statement(body)
             }
             Statement::Return {
                 expresstion: expression,
+                span,
             } => {
                 if matches!(self.current_function_type, FunctionType::None) {
                     Err(new_resolver_error(
                         "Can't return from top-level code.".to_string(),
+                        Some(span),
                     ))
                 } else if matches!(self.current_function_type, FunctionType::Initializer)
                     && expression.is_some()
                 {
                     Err(new_resolver_error(
                         "Can't return value from 'init' method.".to_string(),
+                        Some(span),
                     ))
                 } else if let Some(expr) = expression {
                     self.resolve_expression(expr)
@@ -153,11 +164,12 @@ impl Resolver {
                     Ok(())
                 }
             }
-            Statement::Break => Ok(()),
+            Statement::Break { .. } => Ok(()),
             Statement::ClassDeclaration {
                 name,
                 superclass,
                 methods,
+                ..
             } => {
                 self.declare(name)?;
                 self.define(name);
@@ -166,6 +178,7 @@ impl Resolver {
                     if identifier.name.eq(name) {
                         return Err(new_resolver_error(
                             "A class can't inherit from itself.".to_string(),
+                            Some(&identifier.span),
                         ));
                     }
                     self.resolve_local(identifier);
@@ -185,6 +198,7 @@ impl Resolver {
                         parameters,
                         body,
                         name,
+                        ..
                     } = fun_stmt;
                     self.begin_scope();
                     self.define("this");
@@ -204,6 +218,7 @@ impl Resolver {
                 self.end_scope();
                 Ok(())
             }
+            Statement::Pass { .. } => Ok(()),
         }
     }
 
@@ -252,10 +267,13 @@ impl Resolver {
 
     fn resolve_expression(&mut self, expression: &mut Expression) -> Result<(), LoxError> {
         match expression {
-            Expression::Identifier(identifier) => self.resolve_identifier_expression(identifier),
+            Expression::Identifier { identifier, .. } => {
+                self.resolve_identifier_expression(identifier)
+            }
             Expression::Assignment {
                 identifier,
                 expression,
+                ..
             } => self.resolve_assignment_expression(identifier, expression),
             Expression::Unary { expression, .. } => self.resolve_expression(expression),
             Expression::Binary { left, right, .. } => {
@@ -266,9 +284,14 @@ impl Resolver {
                 self.resolve_expression(left)?;
                 self.resolve_expression(right)
             }
-            Expression::Grouping { expression } => self.resolve_expression(expression),
-            Expression::Call { callee, arguments } => {
-                if let Expression::Identifier(Identifier { name, .. }) = callee.as_ref()
+            Expression::Grouping { expression, .. } => self.resolve_expression(expression),
+            Expression::Call {
+                callee, arguments, ..
+            } => {
+                if let Expression::Identifier {
+                    identifier: Identifier { name, .. },
+                    ..
+                } = callee.as_ref()
                     && name.eq("dbgenv")
                 {
                     println!("{:?}", {
@@ -290,22 +313,25 @@ impl Resolver {
                 self.resolve_expression(object)?;
                 self.resolve_expression(expression)
             }
-            Expression::This(identifier) => {
+            Expression::This { identifier, .. } => {
                 if !matches!(self.current_class_type, ClassType::None) {
                     self.resolve_local(identifier);
                     Ok(())
                 } else {
                     Err(new_resolver_error(
                         "Can't use 'this' outside of class method.".to_string(),
+                        Some(&identifier.span),
                     ))
                 }
             }
             Expression::Super { identifier, .. } => match self.current_class_type {
                 ClassType::None => Err(new_resolver_error(
                     "Can't use 'super' outside of a class.".to_string(),
+                    Some(&identifier.span),
                 )),
                 ClassType::Class => Err(new_resolver_error(
                     "Can't use 'super' in a class with no superclass.".to_string(),
+                    Some(&identifier.span),
                 )),
                 ClassType::SubClass => {
                     self.resolve_local(identifier);
@@ -325,10 +351,13 @@ impl Resolver {
                 Some(DeclarationState::Declared)
             )
         {
-            return Err(new_resolver_error(format!(
-                "Can't read local variable in its own initializer: '{}'.",
-                identifier.name
-            )));
+            return Err(new_resolver_error(
+                format!(
+                    "Can't read local variable in its own initializer: '{}'.",
+                    identifier.name
+                ),
+                Some(&identifier.span),
+            ));
         }
 
         self.resolve_local(identifier);

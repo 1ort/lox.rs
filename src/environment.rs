@@ -45,7 +45,10 @@ impl Environment {
         if let Some(value) = self.0.borrow().values.get(name) {
             Ok(value.clone())
         } else {
-            Err(new_runtime_error(format!("Undefined variable: {} .", name)))
+            Err(new_runtime_error(
+                format!("Undefined variable: {} .", name),
+                None,
+            ))
         }
     }
 
@@ -58,7 +61,10 @@ impl Environment {
         } else if let Some(ref enclosing) = scope.enclosing {
             enclosing.get_at(distance - 1, name)
         } else {
-            Err(new_runtime_error(format!("Undefined variable: {} .", name)))
+            Err(new_runtime_error(
+                format!("Undefined variable: {} .", name),
+                None,
+            ))
         }
     }
 
@@ -70,7 +76,10 @@ impl Environment {
             .entry(name.clone())
             .and_modify(|x| *x = value)
         {
-            Entry::Vacant(_) => Err(new_runtime_error(format!("Undefined variable: {} .", name))),
+            Entry::Vacant(_) => Err(new_runtime_error(
+                format!("Undefined variable: {} .", name),
+                None,
+            )),
             Entry::Occupied(_) => Ok(()),
         }
     }
@@ -88,7 +97,10 @@ impl Environment {
         } else if let Some(ref mut enclosing) = this.enclosing {
             enclosing.assign_at(distance - 1, name, value)
         } else {
-            Err(new_runtime_error(format!("Undefined variable: {} .", name)))
+            Err(new_runtime_error(
+                format!("Undefined variable: {} .", name),
+                None,
+            ))
         }
     }
 }

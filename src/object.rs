@@ -37,10 +37,10 @@ impl LoxObject {
     pub fn neg(&self) -> Result<LoxObject, LoxError> {
         match self {
             LoxObject::Number(num) => Ok(LoxObject::Number(-num)),
-            x => Err(new_runtime_error(format!(
-                "Can not apply unary '-': {:?} is not a number.",
-                x
-            ))),
+            x => Err(new_runtime_error(
+                format!("Can not apply unary '-': {:?} is not a number.", x),
+                None,
+            )),
         }
     }
 
@@ -96,50 +96,50 @@ impl LoxObject {
     pub fn gt(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a > b)),
-            _ => Err(new_runtime_error(format!(
-                "Can not compare {:?} > {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not compare {:?} > {:?}", self, other),
+                None,
+            )),
         }
     }
 
     pub fn ge(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a >= b)),
-            _ => Err(new_runtime_error(format!(
-                "Can not compare {:?} >= {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not compare {:?} >= {:?}", self, other),
+                None,
+            )),
         }
     }
 
     pub fn lt(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a < b)),
-            _ => Err(new_runtime_error(format!(
-                "Can not compare {:?} < {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not compare {:?} < {:?}", self, other),
+                None,
+            )),
         }
     }
 
     pub fn le(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a <= b)),
-            _ => Err(new_runtime_error(format!(
-                "Can not compare {:?} <= {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not compare {:?} <= {:?}", self, other),
+                None,
+            )),
         }
     }
 
     pub fn sub(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a - b)),
-            _ => Err(new_runtime_error(format!(
-                "Can not substract {:?} - {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not substract {:?} - {:?}", self, other),
+                None,
+            )),
         }
     }
 
@@ -157,6 +157,7 @@ impl LoxObject {
             }
             _ => Err(new_runtime_error(
                 "Operands must be two numbers or two strings.".to_string(),
+                None,
             )),
         }
     }
@@ -167,23 +168,26 @@ impl LoxObject {
                 if *b != 0.0 {
                     Ok(LoxObject::Number(a / b))
                 } else {
-                    Err(new_runtime_error("Can not divide by zero".to_string()))
+                    Err(new_runtime_error(
+                        "Can not divide by zero".to_string(),
+                        None,
+                    ))
                 }
             }
-            _ => Err(new_runtime_error(format!(
-                "Can not divide {:?} / {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not divide {:?} / {:?}", self, other),
+                None,
+            )),
         }
     }
 
     pub fn mul(&self, other: &LoxObject) -> Result<LoxObject, LoxError> {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a * b)),
-            _ => Err(new_runtime_error(format!(
-                "Can not multiply {:?} * {:?}",
-                self, other
-            ))),
+            _ => Err(new_runtime_error(
+                format!("Can not multiply {:?} * {:?}", self, other),
+                None,
+            )),
         }
     }
 }

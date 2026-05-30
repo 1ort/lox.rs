@@ -7,6 +7,7 @@ use crate::{
         Program, Statement, UnaryOperator,
     },
     interruption::{LoxError, new_syntax_error},
+    span::Span,
     token::{Token, TokenType},
 };
 
@@ -83,22 +84,21 @@ impl<'a> Parser<'a> {
     fn declaration(&mut self) -> Result<Statement, LoxError> {
         match self.peek().token_type {
             TokenType::Fun => {
-                self.advance();
-                self.fun_declaration().map(Statement::FunctionDeclaration)
+                let start_span = self.advance().span.clone();
+                let fun = self.fun_declaration()?;
+                Ok(Statement::FunctionDeclaration {
+                    span: start_span.union(&fun.span),
+                    function: fun,
+                })
             }
-            TokenType::Var => {
-                self.advance();
-                self.var_declaration()
-            }
-            TokenType::Class => {
-                self.advance();
-                self.class_declaration()
-            }
+            TokenType::Var => self.var_declaration(),
+            TokenType::Class => self.class_declaration(),
             _ => self.statement(),
         }
     }
 
     fn class_declaration(&mut self) -> Result<Statement, LoxError> {
+        let start_span = self.advance().span.clone();
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
@@ -108,7 +108,6 @@ impl<'a> Parser<'a> {
             ));
         };
         self.advance();
-
         let need_superclass = matches!(self.peek().token_type, TokenType::Less);
         let superclass = if need_superclass {
             self.advance();
@@ -121,16 +120,13 @@ impl<'a> Parser<'a> {
                     ));
                 }
             };
-            self.advance();
-            Some(Identifier::new(superclass))
+            let ident_span = &self.advance().span;
+            Some(Identifier::new(superclass, ident_span))
         } else {
             None
         };
-
         self.expect_token(TokenType::LeftBrace, "Expect '{' before class body.")?;
-
         let mut methods: Vec<FunctionStatement> = Vec::new();
-
         loop {
             if matches!(
                 self.peek().token_type,
@@ -146,17 +142,19 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-
-        self.expect_token(TokenType::RightBrace, "Expect '}' after class body.")?;
-
+        let end_span = &self
+            .expect_token(TokenType::RightBrace, "Expect '}' after class body.")?
+            .span;
         Ok(Statement::ClassDeclaration {
             name,
             superclass,
             methods,
+            span: start_span.union(end_span),
         })
     }
 
     fn fun_declaration(&mut self) -> Result<FunctionStatement, LoxError> {
+        let start_span = self.span();
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
@@ -167,7 +165,6 @@ impl<'a> Parser<'a> {
         };
         self.advance();
         self.expect_token(TokenType::LeftParen, "Expected '(' after function name")?;
-
         let mut parameters = Vec::new();
         if !matches!(self.peek().token_type, TokenType::RightParen) {
             loop {
@@ -197,25 +194,26 @@ impl<'a> Parser<'a> {
             }
         }
         self.expect_token(TokenType::RightParen, "Expect ')' after parameters.")?;
-        self.expect_token(TokenType::LeftBrace, "Expect '{' before function body.")?;
+        let block_start_span = self
+            .expect_token(TokenType::LeftBrace, "Expect '{' before function body.")?
+            .span
+            .clone();
 
-        let block = if self.is_inside_function_body {
-            self.block_statement()?
-        } else {
-            self.is_inside_function_body = true;
-            let stmt = self.block_statement()?;
-            self.is_inside_function_body = false;
-            stmt
-        };
+        let enclosing = self.is_inside_function_body;
+        self.is_inside_function_body = true;
+        let block = self.block_statement(&block_start_span)?;
+        self.is_inside_function_body = enclosing;
 
         Ok(FunctionStatement {
             name,
             parameters,
+            span: start_span.union(block.span()),
             body: Box::new(block),
         })
     }
 
     fn var_declaration(&mut self) -> Result<Statement, LoxError> {
+        let start_span = self.advance().span.clone();
         let name = if let TokenType::Identifier(name) = &self.peek().token_type {
             name.clone()
         } else {
@@ -234,37 +232,36 @@ impl<'a> Parser<'a> {
             None
         };
 
-        self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
-        Ok(Statement::VarDeclaration { name, initializer })
+        let end_span = &self
+            .expect_token(TokenType::Semicolon, "Expected ';' after statement.")?
+            .span;
+
+        Ok(Statement::VarDeclaration {
+            name,
+            initializer,
+            span: start_span.union(end_span),
+        })
     }
 
     fn statement(&mut self) -> Result<Statement, LoxError> {
         match self.peek().token_type {
             TokenType::LeftBrace => {
-                self.advance();
-                self.block_statement()
+                let span = self.advance().span.clone();
+                self.block_statement(&span)
             }
-            TokenType::Print => {
-                self.advance();
-                self.print_statement()
-            }
-            TokenType::If => {
-                self.advance();
-                self.if_statement()
-            }
-            TokenType::While => {
-                self.advance();
-                self.while_statement()
-            }
-            TokenType::For => {
-                self.advance();
-                self.for_statement()
-            }
+            TokenType::Print => self.print_statement(),
+            TokenType::If => self.if_statement(),
+            TokenType::While => self.while_statement(),
+            TokenType::For => self.for_statement(),
             TokenType::Break => {
                 let tok = self.advance().clone();
-                self.expect_token(TokenType::Semicolon, "Expected ';' after 'break'.")?;
                 if self.is_inside_loop {
-                    Ok(Statement::Break)
+                    let end_span = &self
+                        .expect_token(TokenType::Semicolon, "Expected ';' after 'break'.")?
+                        .span;
+                    Ok(Statement::Break {
+                        span: tok.span.union(end_span),
+                    })
                 } else {
                     Err(new_syntax_error(
                         "'break' outside of loop body.".to_owned(),
@@ -272,21 +269,17 @@ impl<'a> Parser<'a> {
                     ))
                 }
             }
-            TokenType::Return => {
-                self.advance();
-                self.return_statement()
-            }
+            TokenType::Return => self.return_statement(),
             _ => self.expression_statement(),
         }
     }
 
-    fn block_statement(&mut self) -> Result<Statement, LoxError> {
+    fn block_statement(&mut self, span: &Span) -> Result<Statement, LoxError> {
         let mut statements = Vec::new();
         loop {
             if matches!(self.peek().token_type, TokenType::RightBrace) || self.is_at_end() {
                 break;
             }
-
             match self.declaration() {
                 Ok(stmt) => statements.push(stmt),
                 Err(err) => {
@@ -295,28 +288,40 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-
-        self.expect_token(TokenType::RightBrace, "Expected '}' after block.")?;
-        Ok(Statement::Block { statements })
+        let end_span = &self
+            .expect_token(TokenType::RightBrace, "Expected '}' after block.")?
+            .span;
+        Ok(Statement::Block {
+            statements,
+            span: span.union(end_span),
+        })
     }
 
     fn print_statement(&mut self) -> Result<Statement, LoxError> {
+        let span = self.advance().span.clone();
         let expr = self.expression()?;
-        self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
+        let end_span = &self
+            .expect_token(TokenType::Semicolon, "Expected ';' after statement.")?
+            .span;
         Ok(Statement::Print {
             expression: Box::new(expr),
+            span: span.union(end_span),
         })
     }
 
     fn if_statement(&mut self) -> Result<Statement, LoxError> {
+        let start_span = self.advance().span.clone();
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'if'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after if condition.")?;
         let then_branch = Box::new(self.statement()?);
+        let mut end_span = then_branch.span().clone();
 
         let else_branch = if matches!(self.peek().token_type, TokenType::Else) {
             self.advance();
-            Some(Box::new(self.statement()?))
+            let stmt = Box::new(self.statement()?);
+            end_span = stmt.span().clone();
+            Some(stmt)
         } else {
             None
         };
@@ -325,115 +330,117 @@ impl<'a> Parser<'a> {
             condition,
             then_branch,
             else_branch,
+            span: start_span.union(&end_span),
         })
     }
 
     fn while_statement(&mut self) -> Result<Statement, LoxError> {
+        let start_span = self.advance().span.clone();
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'while'.")?;
         let condition = Box::new(self.expression()?);
         self.expect_token(TokenType::RightParen, "Expected ')' after loop condition.")?;
 
-        let body = if self.is_inside_loop {
-            Box::new(self.statement()?)
-        } else {
-            self.is_inside_loop = true;
-            let stmt = Box::new(self.statement()?);
-            self.is_inside_loop = false;
-            stmt
-        };
+        let enclosing = self.is_inside_loop;
+        self.is_inside_loop = true;
+        let body = Box::new(self.statement()?);
+        self.is_inside_loop = enclosing;
 
-        Ok(Statement::WhileLoop { condition, body })
+        Ok(Statement::WhileLoop {
+            condition,
+            span: start_span.union(body.span()),
+            body,
+        })
     }
 
     fn for_statement(&mut self) -> Result<Statement, LoxError> {
+        let start_span = self.advance().span.clone();
         self.expect_token(TokenType::LeftParen, "Expected '(' after 'for'.")?;
-        let maybe_initializer = match self.peek().token_type {
+        let initializer = match self.peek().token_type {
             TokenType::Semicolon => {
-                self.advance();
-                None
+                let span = self.advance().span.clone();
+                Statement::Pass { span }
             }
-            TokenType::Var => {
-                self.advance();
-                Some(self.var_declaration()?)
-            }
-            _ => Some(self.expression_statement()?),
+            TokenType::Var => self.var_declaration()?,
+            _ => self.expression_statement()?,
         };
-
         let condition = match self.peek().token_type {
             TokenType::Semicolon => Expression::Literal {
+                span: self.span(),
                 value: LiteralValue::Boolean(true),
             },
             _ => self.expression()?,
         };
         self.expect_token(TokenType::Semicolon, "Expected ';' after condition.")?;
-
-        let maybe_increment = match self.peek().token_type {
-            TokenType::RightParen => None,
-            _ => Some(self.expression()?),
+        let increment = match self.peek().token_type {
+            TokenType::RightParen => Statement::Pass { span: self.span() },
+            _ => {
+                let expr = self.expression()?;
+                Statement::Expression {
+                    span: expr.span().clone(),
+                    expression: Box::new(expr),
+                }
+            }
         };
+
         self.expect_token(TokenType::RightParen, "Expected ')' after 'for' clauses.")?;
         self.is_inside_loop = true;
         let body = self.statement()?;
         self.is_inside_loop = false;
 
-        let while_body = if let Some(increment) = maybe_increment {
-            Statement::Block {
-                statements: vec![
-                    body,
-                    Statement::Expression {
-                        expression: Box::new(increment),
-                    },
-                ],
-            }
-        } else {
-            body
+        let while_body = Statement::Block {
+            span: body.span().clone(),
+            statements: vec![body, increment],
         };
-
         let while_loop = Statement::WhileLoop {
             condition: Box::new(condition),
+            span: start_span.union(while_body.span()),
             body: Box::new(while_body),
         };
-
-        let statement = if let Some(initializer) = maybe_initializer {
-            Statement::Block {
-                statements: vec![initializer, while_loop],
-            }
-        } else {
-            while_loop
+        let stmt = Statement::Block {
+            span: while_loop.span().clone(),
+            statements: vec![initializer, while_loop],
         };
-
-        Ok(statement)
+        Ok(stmt)
     }
 
     fn return_statement(&mut self) -> Result<Statement, LoxError> {
+        let start_span = self.advance().span.clone();
         match self.peek().token_type {
             TokenType::Semicolon => {
-                self.advance();
-                Ok(Statement::Return { expresstion: None })
+                let end_span = self.advance().span.clone();
+                Ok(Statement::Return {
+                    expresstion: None,
+                    span: end_span,
+                })
             }
             _ => {
-                let stmt = Ok(Statement::Return {
-                    expresstion: Some(Box::new(self.expression()?)),
-                });
-                self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
-                stmt
+                let expr = Box::new(self.expression()?);
+                let end_span = &self
+                    .expect_token(TokenType::Semicolon, "Expected ';' after statement.")?
+                    .span;
+
+                Ok(Statement::Return {
+                    span: start_span.union(end_span),
+                    expresstion: Some(expr),
+                })
             }
         }
     }
 
     fn expression_statement(&mut self) -> Result<Statement, LoxError> {
         let expr = self.expression()?;
-
-        self.expect_token(TokenType::Semicolon, "Expected ';' after statement.")?;
+        let end_span = &self
+            .expect_token(TokenType::Semicolon, "Expected ';' after statement.")?
+            .span;
         Ok(Statement::Expression {
+            span: expr.span().union(end_span),
             expression: Box::new(expr),
         })
     }
 
-    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> Result<(), LoxError> {
+    fn expect_token(&mut self, expected: TokenType, error_msg: &str) -> Result<&Token, LoxError> {
         if self.peek().token_type == expected {
-            self.advance();
-            Ok(())
+            Ok(self.advance())
         } else {
             Err(new_syntax_error(error_msg.to_owned(), self.peek().clone()))
         }
@@ -449,18 +456,20 @@ impl<'a> Parser<'a> {
         if let TokenType::Equal = self.peek().token_type {
             let tok = self.advance();
             match expr {
-                Expression::Identifier(identifier) => {
+                Expression::Identifier { identifier, span } => {
                     let value = self.assignment()?;
                     return Ok(Expression::Assignment {
                         identifier,
+                        span: span.union(value.span()),
                         expression: Box::new(value),
                     });
                 }
-                Expression::Get { object, name } => {
+                Expression::Get { object, name, span } => {
                     let value = self.assignment()?;
                     return Ok(Expression::Set {
                         object,
                         name,
+                        span: span.union(value.span()),
                         expression: Box::new(value),
                     });
                 }
@@ -485,6 +494,7 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let right = self.and()?;
                 expr = Expression::Logical {
+                    span: expr.span().union(right.span()),
                     left: Box::new(expr),
                     operator: LogicalOperator::Or,
                     right: Box::new(right),
@@ -504,6 +514,7 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let right = self.equality()?;
                 expr = Expression::Logical {
+                    span: expr.span().union(right.span()),
                     left: Box::new(expr),
                     operator: LogicalOperator::And,
                     right: Box::new(right),
@@ -526,6 +537,7 @@ impl<'a> Parser<'a> {
             self.advance();
             let right = self.comparison()?;
             expr = Expression::Binary {
+                span: expr.span().union(right.span()),
                 left: Box::new(expr),
                 operator: binary_operator,
                 right: Box::new(right),
@@ -547,6 +559,7 @@ impl<'a> Parser<'a> {
             self.advance();
             let right = self.term()?;
             expr = Expression::Binary {
+                span: expr.span().union(right.span()),
                 left: Box::new(expr),
                 operator: binary_operator,
                 right: Box::new(right),
@@ -566,6 +579,7 @@ impl<'a> Parser<'a> {
             self.advance();
             let right = self.factor()?;
             expr = Expression::Binary {
+                span: expr.span().union(right.span()),
                 left: Box::new(expr),
                 operator: binary_operator,
                 right: Box::new(right),
@@ -585,6 +599,7 @@ impl<'a> Parser<'a> {
             self.advance();
             let right = self.unary()?;
             expr = Expression::Binary {
+                span: expr.span().union(right.span()),
                 left: Box::new(expr),
                 operator: binary_operator,
                 right: Box::new(right),
@@ -599,9 +614,10 @@ impl<'a> Parser<'a> {
             TokenType::Minus => UnaryOperator::Minus,
             _ => return self.call(),
         };
-        self.advance();
+        let start_span = self.advance().span.clone();
         let expr = self.unary()?;
         Ok(Expression::Unary {
+            span: start_span.union(expr.span()),
             operator: unary_operator,
             expression: Box::new(expr),
         })
@@ -635,8 +651,9 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
-        self.advance();
+        let end_span = &self.advance().span;
         Ok(Expression::Get {
+            span: object.span().union(end_span),
             object,
             name: field_name,
         })
@@ -661,9 +678,11 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        self.expect_token(TokenType::RightParen, "Expect ')' after arguments.")?;
-
+        let end_span = &self
+            .expect_token(TokenType::RightParen, "Expect ')' after arguments.")?
+            .span;
         Ok(Expression::Call {
+            span: callee.span().union(end_span),
             callee,
             arguments: args,
         })
@@ -672,22 +691,33 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Result<Expression, LoxError> {
         use Expression::{Identifier, Literal, This};
         use LiteralValue::*;
+        let span = self.span();
         let expression = match &self.peek().token_type {
             TokenType::False => Literal {
                 value: Boolean(false),
+                span,
             },
             TokenType::True => Literal {
                 value: Boolean(true),
+                span,
             },
-            TokenType::Nil => Literal { value: Nil },
+            TokenType::Nil => Literal { value: Nil, span },
             TokenType::Number(num) => Literal {
                 value: Number(*num),
+                span,
             },
             TokenType::String(string) => Literal {
                 value: String(string.clone()),
+                span,
             },
-            TokenType::Identifier(name) => Identifier(crate::ast::Identifier::new(name.clone())),
-            TokenType::This => This(crate::ast::Identifier::new("this".to_string())),
+            TokenType::Identifier(name) => Identifier {
+                identifier: crate::ast::Identifier::new(name.clone(), &span),
+                span,
+            },
+            TokenType::This => This {
+                identifier: crate::ast::Identifier::new("this".to_string(), &span),
+                span,
+            },
             TokenType::Super => {
                 self.advance();
                 self.expect_token(TokenType::Dot, "Expect '.' after 'super'.")?;
@@ -701,8 +731,9 @@ impl<'a> Parser<'a> {
                     ));
                 };
                 Expression::Super {
-                    identifier: crate::ast::Identifier::new("super".to_string()),
+                    identifier: crate::ast::Identifier::new("super".to_string(), &span),
                     method,
+                    span: span.union(&self.span()),
                 }
             }
             _ => return self.grouping(),
@@ -713,11 +744,12 @@ impl<'a> Parser<'a> {
 
     fn grouping(&mut self) -> Result<Expression, LoxError> {
         if matches!(self.peek().token_type, TokenType::LeftParen) {
-            self.advance();
+            let start_span = self.advance().span.clone();
             let expr = self.expression()?;
             if matches!(self.peek().token_type, TokenType::RightParen) {
-                self.advance();
+                let end_span = &self.advance().span;
                 Ok(Expression::Grouping {
+                    span: start_span.union(end_span),
                     expression: Box::new(expr),
                 })
             } else {
@@ -754,5 +786,9 @@ impl<'a> Parser<'a> {
 
     fn is_at_end(&mut self) -> bool {
         matches!(self.peek().token_type, TokenType::Eof)
+    }
+
+    fn span(&mut self) -> Span {
+        self.peek().span.clone()
     }
 }

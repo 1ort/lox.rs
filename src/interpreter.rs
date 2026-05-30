@@ -11,6 +11,7 @@ use crate::interruption::{LoxError, new_runtime_error};
 use crate::object::LoxObject;
 
 use crate::globals;
+use crate::span::Span;
 
 pub struct Interpreter {
     pub environment: Environment,
@@ -45,28 +46,33 @@ impl Interpreter {
 
     fn exec_statement(&mut self, statement: &Statement) -> Result<JumpKind, LoxError> {
         match statement {
-            Statement::Block { statements } => self.exec_block(statements),
-            Statement::Expression { expression } => {
+            Statement::Block { statements, .. } => self.exec_block(statements),
+            Statement::Expression { expression, .. } => {
                 self.eval_expression(expression)?;
                 Ok(JumpKind::None)
             }
-            Statement::Print { expression } => {
+            Statement::Print { expression, .. } => {
                 let obj = self.eval_expression(expression)?;
                 println!("{}", obj);
                 Ok(JumpKind::None)
             }
-            Statement::VarDeclaration { name, initializer } => {
-                self.exec_var_declaration(name, initializer)
-            }
+            Statement::VarDeclaration {
+                name, initializer, ..
+            } => self.exec_var_declaration(name, initializer),
             Statement::Conditional {
                 condition,
                 then_branch,
                 else_branch,
+                ..
             } => self.exec_conditional(condition, then_branch, else_branch),
-            Statement::WhileLoop { condition, body } => self.exec_while_loop(condition, body),
-            Statement::Break => Ok(JumpKind::Brake),
-            Statement::FunctionDeclaration(func_stmt) => self.exec_function_declaration(func_stmt),
-            Statement::Return { expresstion } => {
+            Statement::WhileLoop {
+                condition, body, ..
+            } => self.exec_while_loop(condition, body),
+            Statement::Break { .. } => Ok(JumpKind::Brake),
+            Statement::FunctionDeclaration { function, .. } => {
+                self.exec_function_declaration(function)
+            }
+            Statement::Return { expresstion, .. } => {
                 let expr_result = match expresstion {
                     None => LoxObject::Nil,
                     Some(expr) => self.eval_expression(expr)?,
@@ -77,7 +83,11 @@ impl Interpreter {
                 name,
                 superclass,
                 methods,
-            } => self.exec_class_declaration(name, superclass, methods),
+                span,
+            } => self
+                .exec_class_declaration(name, superclass, methods)
+                .map_err(|err| err.with_span(span.clone())),
+            Statement::Pass { .. } => Ok(JumpKind::None),
         }
     }
 
@@ -97,7 +107,12 @@ impl Interpreter {
                     class_scope.define("super".to_string(), LoxObject::Class(class_ref.clone()));
                     Some(class_ref)
                 }
-                _ => return Err(new_runtime_error("Superclass must be a class.".to_string())),
+                _ => {
+                    return Err(new_runtime_error(
+                        "Superclass must be a class.".to_string(),
+                        Some(&superclass_identifier.span),
+                    ));
+                }
             }
         } else {
             None
@@ -202,36 +217,49 @@ impl Interpreter {
 
     fn eval_expression(&mut self, expr: &Expression) -> Result<LoxObject, LoxError> {
         match expr {
-            Expression::Grouping { expression } => self.eval_expression(expression),
-            Expression::Literal { value } => self.eval_literal_value(value),
+            Expression::Grouping { expression, .. } => self.eval_expression(expression),
+            Expression::Literal { value, .. } => self.eval_literal_value(value),
             Expression::Unary {
                 operator,
                 expression,
+                ..
             } => self.eval_unary(operator, expression.as_ref()),
             Expression::Binary {
                 left,
                 operator,
                 right,
-            } => self.eval_binary(left, operator, right),
-            Expression::Identifier(identifier) => self.eval_variable(identifier),
+                span,
+            } => self.eval_binary(left, operator, right, span),
+            Expression::Identifier { identifier, .. } => self.eval_variable(identifier),
             Expression::Assignment {
                 identifier,
                 expression,
+                ..
             } => self.eval_assignment(expression, identifier),
             Expression::Logical {
                 left,
                 operator,
                 right,
+                ..
             } => self.eval_logical(left, operator, right),
-            Expression::Call { callee, arguments } => self.eval_call_expr(callee, arguments),
-            Expression::Get { object, name } => self.eval_get(object, name),
+            Expression::Call {
+                callee,
+                arguments,
+                span,
+            } => self.eval_call_expr(callee, arguments, span),
+            Expression::Get { object, name, span } => self.eval_get(object, name, span),
             Expression::Set {
                 object,
                 name,
                 expression,
+                ..
             } => self.eval_set(object, name, expression),
-            Expression::This(identifier) => self.eval_variable(identifier),
-            Expression::Super { identifier, method } => self.eval_super_method(identifier, method),
+            Expression::This { identifier, .. } => self.eval_variable(identifier),
+            Expression::Super {
+                identifier,
+                method,
+                span,
+            } => self.eval_super_method(identifier, method, span),
         }
     }
 
@@ -245,6 +273,7 @@ impl Interpreter {
             name,
             parameters,
             body,
+            ..
         } = func_stmt;
         Rc::new(UserFunction {
             name: name.clone(),
@@ -260,24 +289,26 @@ impl Interpreter {
         &mut self,
         super_identifier: &Identifier,
         method_name: &str,
+        span: &Span,
     ) -> Result<LoxObject, LoxError> {
         let class_obj = self.eval_variable(super_identifier)?;
         let method_func = if let LoxObject::Class(class) = class_obj {
             if let Some(func) = class.get_method(method_name) {
                 func
             } else {
-                return Err(new_runtime_error(format!(
-                    "Undefined property '{}'.",
-                    method_name
-                )));
+                return Err(new_runtime_error(
+                    format!("Undefined property '{}'.", method_name),
+                    Some(span),
+                ));
             }
         } else {
             return Err(new_runtime_error(
                 "Can't resolve 'super': not a class.".to_string(),
+                Some(&super_identifier.span),
             ));
         };
 
-        let mut instance_identifier = Identifier::new("this".to_string());
+        let mut instance_identifier = Identifier::new("this".to_string(), span);
         instance_identifier.resolved_depth = super_identifier.resolved_depth.map(|x| x - 1);
         let instance = self.eval_variable(&instance_identifier)?;
 
@@ -289,7 +320,12 @@ impl Interpreter {
         Ok(LoxObject::UserFunction(callable))
     }
 
-    fn eval_get(&mut self, object: &Expression, name: &String) -> Result<LoxObject, LoxError> {
+    fn eval_get(
+        &mut self,
+        object: &Expression,
+        name: &String,
+        span: &Span,
+    ) -> Result<LoxObject, LoxError> {
         let obj = self.eval_expression(object)?;
 
         let attr = match &obj {
@@ -297,10 +333,14 @@ impl Interpreter {
             _ => {
                 return Err(new_runtime_error(
                     "Only instances have attributes.".to_string(),
+                    Some(object.span()),
                 ));
             }
         }
-        .ok_or(new_runtime_error(format!("Undefined property '{}'.", name)))?;
+        .ok_or(new_runtime_error(
+            format!("Undefined property '{}'.", name),
+            Some(span),
+        ))?;
         if let LoxObject::UserFunction(function) = attr {
             let callable = if function.is_bound() {
                 function
@@ -325,7 +365,10 @@ impl Interpreter {
             instance.set(name.to_owned(), value_ref.clone())?;
             Ok(value_ref)
         } else {
-            Err(new_runtime_error("Only instances have fields.".to_string()))
+            Err(new_runtime_error(
+                "Only instances have fields.".to_string(),
+                Some(object.span()),
+            ))
         }
     }
 
@@ -333,12 +376,17 @@ impl Interpreter {
         let Identifier {
             resolved_depth,
             name,
+            span,
         } = identifier;
 
         let obj_ref = if let Some(distance) = *resolved_depth {
-            self.environment.get_at(distance, name)?
+            self.environment
+                .get_at(distance, name)
+                .map_err(|err| err.with_span(span.clone()))?
         } else {
-            self.globals.get(name)?
+            self.globals
+                .get(name)
+                .map_err(|err| err.with_span(span.clone()))?
         };
         Ok(obj_ref)
     }
@@ -351,13 +399,18 @@ impl Interpreter {
         let Identifier {
             resolved_depth,
             name,
+            span,
         } = identifier;
 
         let value = self.eval_expression(expression)?;
         if let Some(distance) = *resolved_depth {
-            self.environment.assign_at(distance, name, value.clone())?;
+            self.environment
+                .assign_at(distance, name, value.clone())
+                .map_err(|err| err.with_span(span.clone()))?;
         } else {
-            self.globals.assign(name.clone(), value.clone())?
+            self.globals
+                .assign(name.clone(), value.clone())
+                .map_err(|err| err.with_span(span.clone()))?
         }
         Ok(value)
     }
@@ -387,6 +440,7 @@ impl Interpreter {
         left: &Expression,
         operator: &BinaryOperator,
         right: &Expression,
+        span: &Span,
     ) -> Result<LoxObject, LoxError> {
         let left = self.eval_expression(left)?;
         let right = self.eval_expression(right)?;
@@ -403,6 +457,7 @@ impl Interpreter {
             BinaryOperator::Slash => left.div(&right),
             BinaryOperator::Star => left.mul(&right),
         }
+        .map_err(|err| err.with_span(span.clone()))
     }
 
     fn eval_logical(
@@ -431,6 +486,7 @@ impl Interpreter {
         &mut self,
         callee: &Expression,
         argument_expressions: &[Expression],
+        span: &Span,
     ) -> Result<LoxObject, LoxError> {
         let callee_obj = self.eval_expression(callee)?;
         let args = argument_expressions
@@ -438,10 +494,12 @@ impl Interpreter {
             .map(|expr| self.eval_expression(expr))
             .collect::<Result<Vec<LoxObject>, LoxError>>()?;
         match &callee_obj {
-            LoxObject::Class(class) => self.instantiate(class, &args),
+            LoxObject::Class(class) => self
+                .instantiate(class, &args)
+                .map_err(|err| err.with_span(span.clone())),
             LoxObject::NativeFunction(func) => {
                 let NativeFunction { callable, .. } = func.as_ref();
-                Ok(callable(args, &self.environment)?)
+                Ok(callable(args, &self.environment).map_err(|err| err.with_span(span.clone()))?)
             }
             LoxObject::UserFunction(func) => {
                 let UserFunction {
@@ -452,17 +510,21 @@ impl Interpreter {
                     ..
                 } = func.as_ref();
                 if parameters.len() != args.len() {
-                    return Err(new_runtime_error(format!(
-                        "{} takes {} arguments, but {} provided",
-                        func,
-                        parameters.len(),
-                        args.len()
-                    )));
+                    return Err(new_runtime_error(
+                        format!(
+                            "{} takes {} arguments, but {} provided",
+                            func,
+                            parameters.len(),
+                            args.len()
+                        ),
+                        Some(span),
+                    ));
                 };
                 self.eval_call(parameters, code_block, &args, closure, *is_initializer)
             }
             _ => Err(new_runtime_error(
                 "Can only call functions and classes.".to_string(),
+                Some(callee.span()),
             )),
         }
     }
@@ -473,12 +535,15 @@ impl Interpreter {
         arguments: &[LoxObject],
     ) -> Result<LoxObject, LoxError> {
         if class.arity() as usize != arguments.len() {
-            return Err(new_runtime_error(format!(
-                "{} takes {} arguments, but {} provided",
-                class,
-                class.arity(),
-                arguments.len()
-            )));
+            return Err(new_runtime_error(
+                format!(
+                    "{} takes {} arguments, but {} provided",
+                    class,
+                    class.arity(),
+                    arguments.len()
+                ),
+                None,
+            ));
         }
         let instance_rc = Rc::new(Instance::new(Rc::clone(class)));
         let object = LoxObject::Instance(instance_rc);
