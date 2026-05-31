@@ -33,7 +33,7 @@ fn repl() -> ExitCode {
         if line.trim_end().is_empty() {
             break;
         }
-        lox.run(line.trim_end());
+        let _ = lox.run(line.trim_end());
     }
     ExitCode::from(0)
 }

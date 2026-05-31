@@ -13,7 +13,7 @@ use std::iter::Peekable;
 
 pub fn parse_program(
     tokens: Vec<Token>,
-    error_reporter: &dyn ErrorReporter,
+    error_reporter: &impl ErrorReporter,
 ) -> Result<Program, ()> {
     let parser = Parser {
         tokens: tokens.iter().peekable(),

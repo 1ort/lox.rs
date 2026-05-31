@@ -2,8 +2,23 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Identifier, Program, Statement},
+    compile::error_reporter::ErrorReporter,
     error::{LoxError, new_resolver_error},
 };
+
+pub fn resolve_program(
+    program: &mut Program,
+    error_reporter: &impl ErrorReporter,
+) -> Result<(), ()> {
+    let mut resolver = Resolver {
+        scopes: Vec::new(),
+        current_function_type: FunctionType::None,
+        current_class_type: ClassType::None,
+        error_reporter,
+        has_errors: false,
+    };
+    resolver.resolve_program(program)
+}
 
 #[derive(Clone, Copy, Debug)]
 enum DeclarationState {
@@ -25,21 +40,15 @@ enum ClassType {
     SubClass,
 }
 
-pub struct Resolver {
+pub struct Resolver<'a> {
     scopes: Vec<HashMap<String, DeclarationState>>,
     current_function_type: FunctionType,
     current_class_type: ClassType,
+    error_reporter: &'a dyn ErrorReporter,
+    has_errors: bool,
 }
 
-impl Resolver {
-    pub fn new() -> Resolver {
-        Resolver {
-            scopes: Vec::new(),
-            current_function_type: FunctionType::None,
-            current_class_type: ClassType::None,
-        }
-    }
-
+impl<'a> Resolver<'a> {
     fn begin_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
@@ -96,20 +105,27 @@ impl Resolver {
         //println!("resolved depth for {:?}", identifier);
     }
 
-    pub fn resolve_program(&mut self, program: &mut Program) -> Result<(), LoxError> {
-        let mut iterator = program.statements.iter_mut();
+    fn report(&mut self, err: &LoxError) {
+        self.error_reporter.report(err);
+        self.has_errors = true;
+    }
 
-        for result in iterator.by_ref().map(|stmt| self.resolve_statement(stmt)) {
-            if result.is_err() {
-                return result.map(|_| ());
+    fn resolve_program(&mut self, program: &mut Program) -> Result<(), ()> {
+        for stmt in program.statements.iter_mut() {
+            let res = self.resolve_statement(stmt);
+            if let Err(err) = res {
+                self.report(&err);
             }
         }
-        Ok(())
+        if self.has_errors { Err(()) } else { Ok(()) }
     }
 
     fn resolve_statement(&mut self, stmt: &mut Statement) -> Result<(), LoxError> {
         match stmt {
-            Statement::Block { statements, .. } => self.resolve_block_stmt(statements),
+            Statement::Block { statements, .. } => {
+                self.resolve_block_stmt(statements);
+                Ok(())
+            }
             Statement::VarDeclaration {
                 name,
                 initializer,
@@ -127,8 +143,12 @@ impl Resolver {
                     },
                 span,
             } => {
-                self.declare(name)
-                    .map_err(|err| err.with_span(span.clone()))?;
+                let res = self
+                    .declare(name)
+                    .map_err(|err| err.with_span(span.clone()));
+                if let Err(err) = res {
+                    self.report(&err);
+                }
                 self.define(name);
                 self.resolve_function(parameters, body, FunctionType::Function)
             }
@@ -140,8 +160,14 @@ impl Resolver {
                 else_branch,
                 ..
             } => {
-                self.resolve_expression(condition)?;
-                self.resolve_statement(then_branch)?;
+                let res = self.resolve_expression(condition);
+                if let Err(err) = res {
+                    self.report(&err);
+                }
+                let res = self.resolve_statement(then_branch);
+                if let Err(err) = res {
+                    self.report(&err);
+                }
                 if let Some(stmt) = else_branch {
                     self.resolve_statement(stmt)?;
                 }
@@ -150,7 +176,10 @@ impl Resolver {
             Statement::WhileLoop {
                 condition, body, ..
             } => {
-                self.resolve_expression(condition)?;
+                let res = self.resolve_expression(condition);
+                if let Err(err) = res {
+                    self.report(&err);
+                }
                 self.resolve_statement(body)
             }
             Statement::Return {
@@ -182,8 +211,12 @@ impl Resolver {
                 methods,
                 span,
             } => {
-                self.declare(name)
-                    .map_err(|err| err.with_span(span.clone()))?;
+                let res = self
+                    .declare(name)
+                    .map_err(|err| err.with_span(span.clone()));
+                if let Err(err) = res {
+                    self.report(&err);
+                }
                 self.define(name);
 
                 if let Some(identifier) = superclass {
@@ -205,7 +238,7 @@ impl Resolver {
                     ClassType::Class
                 };
 
-                methods.iter_mut().try_for_each(|fun_stmt| {
+                for fun_stmt in methods.iter_mut() {
                     let FunctionStatement {
                         parameters,
                         body,
@@ -214,7 +247,7 @@ impl Resolver {
                     } = fun_stmt;
                     self.begin_scope();
                     self.define("this");
-                    self.resolve_function(
+                    let res = self.resolve_function(
                         parameters,
                         body,
                         if name.eq(&"init") {
@@ -222,10 +255,12 @@ impl Resolver {
                         } else {
                             FunctionType::Function
                         },
-                    )?;
+                    );
+                    if let Err(err) = res {
+                        self.report(&err);
+                    }
                     self.end_scope();
-                    Ok(())
-                })?;
+                }
                 self.current_class_type = enclosing_class_type;
                 self.end_scope();
                 Ok(())
@@ -234,13 +269,16 @@ impl Resolver {
         }
     }
 
-    fn resolve_block_stmt(&mut self, statements: &mut [Statement]) -> Result<(), LoxError> {
+    fn resolve_block_stmt(&mut self, statements: &mut [Statement]) {
         self.begin_scope();
-        let result = statements
-            .iter_mut()
-            .try_for_each(|stmt| self.resolve_statement(stmt));
+        for stmt in statements.iter_mut() {
+            let res = self.resolve_statement(stmt);
+            if let Err(err) = res {
+                self.report(&err);
+            }
+        }
+
         self.end_scope();
-        result
     }
 
     fn resolve_function(
@@ -254,15 +292,18 @@ impl Resolver {
 
         self.begin_scope();
         for param in parameters {
-            self.declare(&param.name)
-                .map_err(|err| err.with_span(param.span.clone()))?;
+            let res = self
+                .declare(&param.name)
+                .map_err(|err| err.with_span(param.span.clone()));
+            if let Err(err) = res {
+                self.report(&err);
+            }
             self.define(&param.name);
         }
-        self.resolve_statement(body)?;
+        let res = self.resolve_statement(body)?;
         self.end_scope();
-
         self.current_function_type = enclosing_function_type;
-        Ok(())
+        Ok(res)
     }
 
     fn resolve_var_declaration(

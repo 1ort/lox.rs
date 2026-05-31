@@ -7,14 +7,12 @@ This implementation is not recommended for use in production environments.
 
 ## Correctness
 
-The interpreter has been tested using the test suite from the "Crafting Interpreters" repository (version "jlox") and passes 235 out of 239 tests.
+The interpreter has been tested using the test suite from the "Crafting Interpreters" repository (version "jlox") and passes 236 out of 239 tests.
 
 ### Failed tests
 
 - test/method/too_many_parameters.lox
   - Implementation detail: my interpreter reports an additional syntax error following synchronization in the last method of the class. However, the error expected by the test is reported correctly.
-- test/super/super_at_top_level.lox
-  - The interpreter expects two errors, but in my implementation, the resolver does not group errors; consequently, the interpreter stops immediately after the first one. 
 - test/unexpected_character.lox
   - My interpreter formats "unexpected symbol" errors slightly differently.
 - test/variable/collide_with_parameter.lox
