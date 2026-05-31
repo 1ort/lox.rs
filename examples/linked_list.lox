@@ -1,0 +1,37 @@
+class Node {
+    init(v, n) { this.value = v; this.next = n; }
+}
+
+class List {
+    init() { this.head = nil; }
+
+    addFirst(v) {
+        this.head = Node(v, this.head);
+    }
+
+    removeFirst() {
+        if (this.head == nil) return nil;
+        var v = this.head.value;
+        this.head = this.head.next;
+        return v;
+    }
+
+    show() {
+        var s = "[";
+        var cur = this.head;
+        while (cur != nil) {
+            s = s + concat(cur.value);
+            if (cur.next != nil) s = s + ", ";
+            cur = cur.next;
+        }
+        print s + "]";
+    }
+}
+
+// Example
+var list = List();
+list.addFirst(2);
+list.addFirst(1);
+list.show();  // [1, 2]
+list.removeFirst();  // returns 1
+list.show();  // [2]
