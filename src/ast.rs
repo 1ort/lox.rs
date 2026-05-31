@@ -99,6 +99,16 @@ impl Statement {
     }
 }
 
+// To big enums?
+// Best if enum can be <= 16 bytes
+// Good <= 64 bytes
+const ASSERT_SIZEOF_STMT: () = {
+    assert!(std::mem::size_of::<Statement>() == 152);
+};
+const ASSERT_SIZEOF_EXPR: () = {
+    assert!(std::mem::size_of::<Expression>() == 128);
+};
+
 #[derive(Debug, Clone)]
 pub struct FunctionStatement {
     pub name: String,
