@@ -1,7 +1,7 @@
 # Lox.rs
 
-A tree-walk Lox interpreter written in Rust.
-This project serves as a learning exercise for studying interpreter architecture and language design. It was implemented based on the book "Crafting Interpreters".
+A tree-walk [Lox](https://craftinginterpreters.com/the-lox-language.html) interpreter written in Rust.
+This project serves as a learning exercise for studying interpreter architecture and language design. It was implemented based on the book "[Crafting Interpreters](https://craftinginterpreters.com/)".
 
 This implementation is not recommended for use in production environments.
 
@@ -12,14 +12,13 @@ The interpreter has been tested using the test suite from the "Crafting Interpre
 ### Failed tests
 
 - test/method/too_many_parameters.lox
-  Implementation detail: my interpreter reports an additional syntax error following synchronization in the last method of the class.
-  However, the error expected by the test is reported correctly.
+  - Implementation detail: my interpreter reports an additional syntax error following synchronization in the last method of the class. However, the error expected by the test is reported correctly.
 - test/super/super_at_top_level.lox
-  The interpreter expects two errors, but in my implementation, the resolver does not group errors; consequently, the interpreter stops immediately after the first one. 
+  - The interpreter expects two errors, but in my implementation, the resolver does not group errors; consequently, the interpreter stops immediately after the first one. 
 - test/unexpected_character.lox
-  My interpreter formats "unexpected symbol" errors slightly differently.
+  - My interpreter formats "unexpected symbol" errors slightly differently.
 - test/variable/collide_with_parameter.lox
-  In my implementation, function arguments reside in a separate scope from the function body; therefore, shadowing them is not an error.
+  - In my implementation, function arguments reside in a separate scope from the function body; therefore, shadowing them is not an error.
 
 ## Syntax
 
