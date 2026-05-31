@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Identifier, Program, Statement},
-    interruption::{LoxError, new_resolver_error},
+    error::{LoxError, new_resolver_error},
 };
 
 #[derive(Clone, Copy, Debug)]

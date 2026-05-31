@@ -1,5 +1,5 @@
 use crate::{
-    interruption::{LoxError, new_runtime_error},
+    error::{LoxError, new_runtime_error},
     runtime::{environment::Environment, function::NativeFunction, object::LoxObject},
 };
 use std::{

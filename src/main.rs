@@ -9,7 +9,7 @@ use std::{
 
 mod ast;
 mod compile;
-mod interruption;
+mod error;
 mod runner;
 mod runtime;
 mod span;

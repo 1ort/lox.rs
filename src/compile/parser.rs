@@ -7,7 +7,7 @@ use crate::{
         Program, Statement, UnaryOperator,
     },
     compile::token::{Token, TokenType},
-    interruption::{LoxError, new_syntax_error},
+    error::{LoxError, new_syntax_error},
     span::Span,
 };
 
