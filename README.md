@@ -20,6 +20,16 @@ The interpreter has been tested using the test suite from the "Crafting Interpre
 - test/variable/collide_with_parameter.lox
   - In my implementation, function arguments reside in a separate scope from the function body; therefore, shadowing them is not an error.
 
+## Limitations
+
+The following limitations restrict the application of the project:
+- No exception handling (try/except)
+- No user input (input)
+- No garbage collection (cyclic references persist and lead to memory leaks)
+- No built-in collections (dictionaries, lists, etc.)
+  - Although the language does allow for the implementation of linked lists and certain other data structures directly in Lox.
+- No imports
+
 ## Syntax
 
 ### Comments
