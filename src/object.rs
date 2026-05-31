@@ -37,8 +37,8 @@ impl LoxObject {
     pub fn neg(&self) -> Result<LoxObject, LoxError> {
         match self {
             LoxObject::Number(num) => Ok(LoxObject::Number(-num)),
-            x => Err(new_runtime_error(
-                format!("Can not apply unary '-': {:?} is not a number.", x),
+            _ => Err(new_runtime_error(
+                "Operand must be a number.".to_string(),
                 None,
             )),
         }
@@ -97,7 +97,7 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a > b)),
             _ => Err(new_runtime_error(
-                format!("Can not compare {:?} > {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }
@@ -107,7 +107,7 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a >= b)),
             _ => Err(new_runtime_error(
-                format!("Can not compare {:?} >= {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }
@@ -117,7 +117,7 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a < b)),
             _ => Err(new_runtime_error(
-                format!("Can not compare {:?} < {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }
@@ -127,7 +127,7 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Boolean(a <= b)),
             _ => Err(new_runtime_error(
-                format!("Can not compare {:?} <= {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }
@@ -137,7 +137,7 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a - b)),
             _ => Err(new_runtime_error(
-                format!("Can not substract {:?} - {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }
@@ -147,12 +147,6 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a + b)),
             (LoxObject::String(a), LoxObject::String(b)) => {
-                Ok(LoxObject::String(format!("{}{}", a, b)))
-            }
-            (LoxObject::String(a), LoxObject::Number(b)) => {
-                Ok(LoxObject::String(format!("{}{}", a, b)))
-            }
-            (LoxObject::Number(a), LoxObject::String(b)) => {
                 Ok(LoxObject::String(format!("{}{}", a, b)))
             }
             _ => Err(new_runtime_error(
@@ -175,7 +169,7 @@ impl LoxObject {
                 }
             }
             _ => Err(new_runtime_error(
-                format!("Can not divide {:?} / {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }
@@ -185,7 +179,7 @@ impl LoxObject {
         match (self, other) {
             (LoxObject::Number(a), LoxObject::Number(b)) => Ok(LoxObject::Number(a * b)),
             _ => Err(new_runtime_error(
-                format!("Can not multiply {:?} * {:?}", self, other),
+                "Operands must be numbers.".to_string(),
                 None,
             )),
         }

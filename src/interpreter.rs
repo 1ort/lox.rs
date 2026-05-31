@@ -10,8 +10,8 @@ use crate::function::{NativeFunction, UserFunction};
 use crate::interruption::{LoxError, new_runtime_error};
 use crate::object::LoxObject;
 
-use crate::globals;
 use crate::span::Span;
+use crate::{globals, span};
 
 pub struct Interpreter {
     pub environment: Environment,
@@ -222,8 +222,8 @@ impl Interpreter {
             Expression::Unary {
                 operator,
                 expression,
-                ..
-            } => self.eval_unary(operator, expression.as_ref()),
+                span,
+            } => self.eval_unary(operator, expression.as_ref(), span),
             Expression::Binary {
                 left,
                 operator,
@@ -277,7 +277,7 @@ impl Interpreter {
         } = func_stmt;
         Rc::new(UserFunction {
             name: name.clone(),
-            parameters: parameters.clone(),
+            parameters: parameters.iter().map(|ident| ident.name.clone()).collect(),
             code_block: Rc::new(*body.clone()),
             closure,
             is_initializer: is_method && name.eq("init"),
@@ -332,7 +332,7 @@ impl Interpreter {
             LoxObject::Instance(instance) => instance.get(name),
             _ => {
                 return Err(new_runtime_error(
-                    "Only instances have attributes.".to_string(),
+                    "Only instances have properties.".to_string(),
                     Some(object.span()),
                 ));
             }
@@ -428,13 +428,16 @@ impl Interpreter {
         &mut self,
         operator: &UnaryOperator,
         expression: &Expression,
+        span: &Span,
     ) -> Result<LoxObject, LoxError> {
         let expr_value = self.eval_expression(expression)?;
         match operator {
             UnaryOperator::Minus => expr_value.neg(),
             UnaryOperator::Bang => expr_value.not(),
         }
+        .map_err(|err| err.with_span(span.clone()))
     }
+
     fn eval_binary(
         &mut self,
         left: &Expression,
@@ -512,8 +515,7 @@ impl Interpreter {
                 if parameters.len() != args.len() {
                     return Err(new_runtime_error(
                         format!(
-                            "{} takes {} arguments, but {} provided",
-                            func,
+                            "Expected {} arguments but got {}.",
                             parameters.len(),
                             args.len()
                         ),
@@ -537,8 +539,7 @@ impl Interpreter {
         if class.arity() as usize != arguments.len() {
             return Err(new_runtime_error(
                 format!(
-                    "{} takes {} arguments, but {} provided",
-                    class,
+                    "Expected {} arguments but got {}.",
                     class.arity(),
                     arguments.len()
                 ),

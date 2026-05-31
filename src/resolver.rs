@@ -50,7 +50,13 @@ impl Resolver {
 
     fn declare(&mut self, name: &str) -> Result<(), LoxError> {
         if matches!(self.get_state_in_current_scope(name), Some(..)) {
-            eprintln!("Already a variable with this name in this scope: {}", name)
+            return Err(new_resolver_error(
+                format!(
+                    "Error at '{}': Already a variable with this name in this scope.",
+                    name
+                ),
+                None,
+            ));
         }
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.to_string(), DeclarationState::Declared);
@@ -105,8 +111,12 @@ impl Resolver {
         match stmt {
             Statement::Block { statements, .. } => self.resolve_block_stmt(statements),
             Statement::VarDeclaration {
-                name, initializer, ..
-            } => self.resolve_var_declaration(name, initializer),
+                name,
+                initializer,
+                span,
+            } => self
+                .resolve_var_declaration(name, initializer)
+                .map_err(|err| err.with_span(span.clone())),
             Statement::FunctionDeclaration {
                 function:
                     FunctionStatement {
@@ -115,9 +125,10 @@ impl Resolver {
                         body,
                         ..
                     },
-                ..
+                span,
             } => {
-                self.declare(name)?;
+                self.declare(name)
+                    .map_err(|err| err.with_span(span.clone()))?;
                 self.define(name);
                 self.resolve_function(parameters, body, FunctionType::Function)
             }
@@ -148,14 +159,14 @@ impl Resolver {
             } => {
                 if matches!(self.current_function_type, FunctionType::None) {
                     Err(new_resolver_error(
-                        "Can't return from top-level code.".to_string(),
+                        "Error at 'return': Can't return from top-level code.".to_string(),
                         Some(span),
                     ))
                 } else if matches!(self.current_function_type, FunctionType::Initializer)
                     && expression.is_some()
                 {
                     Err(new_resolver_error(
-                        "Can't return value from 'init' method.".to_string(),
+                        "Error at 'return': Can't return a value from an initializer.".to_string(),
                         Some(span),
                     ))
                 } else if let Some(expr) = expression {
@@ -169,15 +180,16 @@ impl Resolver {
                 name,
                 superclass,
                 methods,
-                ..
+                span,
             } => {
-                self.declare(name)?;
+                self.declare(name)
+                    .map_err(|err| err.with_span(span.clone()))?;
                 self.define(name);
 
                 if let Some(identifier) = superclass {
                     if identifier.name.eq(name) {
                         return Err(new_resolver_error(
-                            "A class can't inherit from itself.".to_string(),
+                            format!("Error at '{}': A class can't inherit from itself.", name),
                             Some(&identifier.span),
                         ));
                     }
@@ -233,7 +245,7 @@ impl Resolver {
 
     fn resolve_function(
         &mut self,
-        parameters: &Vec<String>,
+        parameters: &Vec<Identifier>,
         body: &mut Statement,
         function_type: FunctionType,
     ) -> Result<(), LoxError> {
@@ -242,8 +254,9 @@ impl Resolver {
 
         self.begin_scope();
         for param in parameters {
-            self.declare(param)?;
-            self.define(param);
+            self.declare(&param.name)
+                .map_err(|err| err.with_span(param.span.clone()))?;
+            self.define(&param.name);
         }
         self.resolve_statement(body)?;
         self.end_scope();
@@ -319,18 +332,19 @@ impl Resolver {
                     Ok(())
                 } else {
                     Err(new_resolver_error(
-                        "Can't use 'this' outside of class method.".to_string(),
+                        "Error at 'this': Can't use 'this' outside of a class.".to_string(),
                         Some(&identifier.span),
                     ))
                 }
             }
             Expression::Super { identifier, .. } => match self.current_class_type {
                 ClassType::None => Err(new_resolver_error(
-                    "Can't use 'super' outside of a class.".to_string(),
+                    "Error at 'super': Can't use 'super' outside of a class.".to_string(),
                     Some(&identifier.span),
                 )),
                 ClassType::Class => Err(new_resolver_error(
-                    "Can't use 'super' in a class with no superclass.".to_string(),
+                    "Error at 'super': Can't use 'super' in a class with no superclass."
+                        .to_string(),
                     Some(&identifier.span),
                 )),
                 ClassType::SubClass => {
@@ -353,7 +367,7 @@ impl Resolver {
         {
             return Err(new_resolver_error(
                 format!(
-                    "Can't read local variable in its own initializer: '{}'.",
+                    "Error at '{}': Can't read local variable in its own initializer.",
                     identifier.name
                 ),
                 Some(&identifier.span),

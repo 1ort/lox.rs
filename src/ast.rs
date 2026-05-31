@@ -78,7 +78,7 @@ impl Statement {
 #[derive(Debug, Clone)]
 pub struct FunctionStatement {
     pub name: String,
-    pub parameters: Vec<String>,
+    pub parameters: Vec<Identifier>,
     pub body: Box<Statement>,
     pub span: Span,
 }

@@ -46,7 +46,7 @@ impl Environment {
             Ok(value.clone())
         } else {
             Err(new_runtime_error(
-                format!("Undefined variable: {} .", name),
+                format!("Undefined variable '{}'.", name),
                 None,
             ))
         }
@@ -62,7 +62,7 @@ impl Environment {
             enclosing.get_at(distance - 1, name)
         } else {
             Err(new_runtime_error(
-                format!("Undefined variable: {} .", name),
+                format!("Undefined variable '{}'.", name),
                 None,
             ))
         }
@@ -77,7 +77,7 @@ impl Environment {
             .and_modify(|x| *x = value)
         {
             Entry::Vacant(_) => Err(new_runtime_error(
-                format!("Undefined variable: {} .", name),
+                format!("Undefined variable '{}'.", name),
                 None,
             )),
             Entry::Occupied(_) => Ok(()),
@@ -98,7 +98,7 @@ impl Environment {
             enclosing.assign_at(distance - 1, name, value)
         } else {
             Err(new_runtime_error(
-                format!("Undefined variable: {} .", name),
+                format!("Undefined variable '{}'.", name),
                 None,
             ))
         }

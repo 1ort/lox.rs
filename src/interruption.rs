@@ -1,8 +1,8 @@
-use std::fmt;
+use std::fmt::{self, write};
 use std::fmt::{Display, Formatter};
 
 use crate::span::Span;
-use crate::token::Token;
+use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone)]
 pub enum LoxError {
@@ -41,29 +41,38 @@ impl Display for LoxError {
             LoxError::Runtime { message, span } => {
                 write!(f, "{}", message)?;
                 if let Some(span) = span {
-                    write!(f, "[{}]", span.line)
+                    write!(f, "\n[line {}]", span.line)
                 } else {
-                    write!(f, "\n[line 0]")
+                    Ok(())
                 }
             }
             LoxError::Resolver { message, span } => {
-                write!(f, "{}", message)?;
                 if let Some(span) = span {
-                    write!(f, "\n[line {}]", span.line)
-                } else {
-                    write!(f, "\n[line 0]")
+                    write!(f, "[line {}] ", span.line)?;
                 }
+                write!(f, "{}", message)
             }
             LoxError::Syntax {
                 message,
                 token:
                     Token {
-                        token_type: _token_type,
+                        token_type,
                         lexeme,
                         span,
                     },
             } => {
-                write!(f, "[{}] Error at '{}': {}", span.line, lexeme, message)
+                write!(f, "[line {}]", span.line)?;
+                match token_type {
+                    TokenType::Eof => write!(f, " Error at end:")?,
+                    _ => {
+                        if !lexeme.is_empty() {
+                            write!(f, " Error at '{}':", lexeme,)?;
+                        } else {
+                            write!(f, " Error:")?;
+                        }
+                    }
+                }
+                write!(f, " {}", message)
             }
         }
     }

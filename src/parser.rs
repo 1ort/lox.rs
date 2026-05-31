@@ -103,7 +103,7 @@ impl<'a> Parser<'a> {
             name.clone()
         } else {
             return Err(new_syntax_error(
-                "Expected class name after 'class'.".to_owned(),
+                "Expect class name after 'class'.".to_owned(),
                 self.peek().clone(),
             ));
         };
@@ -115,7 +115,7 @@ impl<'a> Parser<'a> {
                 TokenType::Identifier(superclass) => superclass.clone(),
                 _ => {
                     return Err(new_syntax_error(
-                        "Expected superclass name.".to_owned(),
+                        "Expect superclass name.".to_owned(),
                         self.peek().clone(),
                     ));
                 }
@@ -170,7 +170,7 @@ impl<'a> Parser<'a> {
             loop {
                 if parameters.len() >= 255 {
                     return Err(new_syntax_error(
-                        "Function can't have more than 255 params.".to_owned(),
+                        "Can't have more than 255 parameters.".to_owned(),
                         self.peek().clone(),
                     ));
                 }
@@ -179,10 +179,12 @@ impl<'a> Parser<'a> {
                     param.clone()
                 } else {
                     return Err(new_syntax_error(
-                        "Expected function parameter to be identifier.".to_owned(),
+                        "Expect function parameter to be identifier.".to_owned(),
                         self.peek().clone(),
                     ));
                 };
+
+                let param = Identifier::new(param, &self.span());
                 parameters.push(param);
                 self.advance();
 
@@ -218,7 +220,7 @@ impl<'a> Parser<'a> {
             name.clone()
         } else {
             return Err(new_syntax_error(
-                "Variable name expected.".to_owned(),
+                "Expect variable name.".to_owned(),
                 self.peek().clone(),
             ));
         };
@@ -416,7 +418,7 @@ impl<'a> Parser<'a> {
             _ => {
                 let expr = Box::new(self.expression()?);
                 let end_span = &self
-                    .expect_token(TokenType::Semicolon, "Expected ';' after statement.")?
+                    .expect_token(TokenType::Semicolon, "Expect ';' after statement.")?
                     .span;
 
                 Ok(Statement::Return {
@@ -430,7 +432,7 @@ impl<'a> Parser<'a> {
     fn expression_statement(&mut self) -> Result<Statement, LoxError> {
         let expr = self.expression()?;
         let end_span = &self
-            .expect_token(TokenType::Semicolon, "Expected ';' after statement.")?
+            .expect_token(TokenType::Semicolon, "Expect ';' after expression.")?
             .span;
         Ok(Statement::Expression {
             span: expr.span().union(end_span),
@@ -646,7 +648,7 @@ impl<'a> Parser<'a> {
             TokenType::Identifier(name) => name.clone(),
             _ => {
                 return Err(new_syntax_error(
-                    "Expected field name after '.'".to_owned(),
+                    "Expect property name after '.'.".to_owned(),
                     self.peek().clone(),
                 ));
             }
@@ -702,10 +704,33 @@ impl<'a> Parser<'a> {
                 span,
             },
             TokenType::Nil => Literal { value: Nil, span },
-            TokenType::Number(num) => Literal {
-                value: Number(*num),
-                span,
-            },
+            TokenType::Number(num) => {
+                let int_part = num.clone();
+                self.advance();
+                if !matches!(self.peek().token_type, TokenType::Dot) {
+                    return Ok(Literal {
+                        value: Number(int_part.parse::<f64>().unwrap()),
+                        span,
+                    });
+                }
+                self.advance();
+                match &self.peek().token_type {
+                    TokenType::Number(fract_part) => Literal {
+                        value: Number(
+                            format!("{}.{}", int_part, fract_part)
+                                .parse::<f64>()
+                                .unwrap(),
+                        ),
+                        span,
+                    },
+                    _ => {
+                        return self.finish_get(Box::new(Literal {
+                            value: Number(int_part.parse::<f64>().unwrap()),
+                            span,
+                        }));
+                    }
+                }
+            }
             TokenType::String(string) => Literal {
                 value: String(string.clone()),
                 span,
@@ -726,7 +751,7 @@ impl<'a> Parser<'a> {
                     name.clone()
                 } else {
                     return Err(new_syntax_error(
-                        "Expected superclass method name.".to_owned(),
+                        "Expect superclass method name.".to_owned(),
                         self.peek().clone(),
                     ));
                 };
@@ -769,8 +794,11 @@ impl<'a> Parser<'a> {
                 "Unexpected EOF".to_owned(),
                 self.peek().clone(),
             )),
+            TokenType::Unexpected(ref message) => {
+                Err(new_syntax_error(message.clone(), self.peek().clone()))
+            }
             _ => Err(new_syntax_error(
-                "Unexpected token".to_owned(),
+                "Expect expression.".to_owned(),
                 self.peek().clone(),
             )),
         }

@@ -70,23 +70,7 @@ impl<'a> Lexer<'a> {
 
     fn lex_number(self: &mut Lexer<'a>) -> Token {
         let mut span = self.span(0);
-        let mut buff = self.take_till(|c| c.is_ascii_digit());
-        if self.peek() == Some(&'.') {
-            buff.push(self.next().unwrap());
-            let fract = self.take_till(|c| c.is_ascii_digit());
-            if fract.is_empty() {
-                span.len = buff.len();
-                return Token {
-                    token_type: TokenType::Unexpected(
-                        "Invalid number. Fractional part expected.".to_string(),
-                    ),
-                    lexeme: buff,
-                    span,
-                };
-            }
-            buff.push_str(&fract);
-        }
-
+        let buff = self.take_till(|c| c.is_ascii_digit());
         span.len = buff.len();
         Token {
             token_type: TokenType::Number(buff.parse().unwrap()),
@@ -102,17 +86,20 @@ impl<'a> Lexer<'a> {
         let content = &self.take_till(|c| c.ne(&'"'));
         buff.push_str(content);
 
-        let token_type = if self.match_next('"') {
+        if self.match_next('"') {
             buff.push('"');
-            TokenType::String(content.clone())
+            span.len = buff.len();
+            Token {
+                token_type: TokenType::String(content.clone()),
+                lexeme: buff,
+                span,
+            }
         } else {
-            TokenType::Unexpected("expect closing '\"' for string.".to_string())
-        };
-        span.len = buff.len();
-        Token {
-            token_type,
-            lexeme: buff,
-            span,
+            Token {
+                token_type: TokenType::Unexpected("Unterminated string.".to_string()),
+                lexeme: "".to_string(),
+                span,
+            }
         }
     }
 
@@ -219,12 +206,20 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn take_till(self: &mut Lexer<'a>, till: impl Fn(char) -> bool) -> String {
+    fn take_till(self: &mut Lexer<'a>, till: impl Fn(&char) -> bool) -> String {
         let mut buff = String::new();
         while let Some(c) = self.peek() {
-            if !till(*c) {
+            let c = &c.clone();
+
+            if !till(c) {
                 break;
             }
+            if c == &'\n' {
+                self.line += 1;
+                self.col = 1;
+                self.pos += 1;
+            }
+
             buff.push(*c);
             self.next();
         }
@@ -235,9 +230,9 @@ impl<'a> Lexer<'a> {
         self.skip_till(|c| c.is_whitespace());
     }
 
-    fn skip_till(self: &mut Lexer<'a>, till: impl Fn(char) -> bool) {
+    fn skip_till(self: &mut Lexer<'a>, till: impl Fn(&char) -> bool) {
         while let Some(c) = self.peek() {
-            if !till(*c) {
+            if !till(c) {
                 break;
             }
             if c == &'\n' {

@@ -11,7 +11,7 @@ pub struct NativeFunction {
 
 impl std::fmt::Display for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<fn {}>", self.name)
+        write!(f, "<native fn>")
     }
 }
 
