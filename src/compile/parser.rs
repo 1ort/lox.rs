@@ -1,42 +1,41 @@
-use core::slice::Iter;
-use std::iter::Peekable;
-
 use crate::{
     ast::{
         BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
         Program, Statement, UnaryOperator,
     },
+    compile::error_reporter::ErrorReporter,
     compile::token::{Token, TokenType},
     error::{LoxError, new_syntax_error},
     span::Span,
 };
+use core::slice::Iter;
+use std::iter::Peekable;
 
-pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Vec<LoxError>> {
-    let tokens_it = tokens.iter().peekable();
-    let parser = Parser::new(tokens_it);
+pub fn parse_program(
+    tokens: Vec<Token>,
+    error_reporter: &dyn ErrorReporter,
+) -> Result<Program, ()> {
+    let parser = Parser {
+        tokens: tokens.iter().peekable(),
+        is_inside_loop: false,
+        is_inside_function_body: false,
+        error_reporter,
+        has_errors: false,
+    };
+
     parser.program()
 }
 
-type TokensPeekable<'a> = Peekable<Iter<'a, Token>>;
-
 struct Parser<'a> {
-    tokens: TokensPeekable<'a>,
+    tokens: Peekable<Iter<'a, Token>>,
     is_inside_loop: bool,
     is_inside_function_body: bool,
-    errors: Vec<LoxError>,
+    error_reporter: &'a dyn ErrorReporter,
+    has_errors: bool,
 }
 
 impl<'a> Parser<'a> {
-    fn new(tokens: TokensPeekable<'a>) -> Parser<'a> {
-        Parser {
-            tokens,
-            is_inside_loop: false,
-            is_inside_function_body: false,
-            errors: Vec::new(),
-        }
-    }
-
-    fn program(mut self) -> Result<Program, Vec<LoxError>> {
+    fn program(mut self) -> Result<Program, ()> {
         let mut program = Program {
             statements: Vec::new(),
         };
@@ -45,15 +44,16 @@ impl<'a> Parser<'a> {
             match self.declaration() {
                 Ok(stmt) => program.statements.push(stmt),
                 Err(err) => {
-                    self.errors.push(err);
+                    self.error_reporter.report(&err);
+                    self.has_errors = true;
                     self.synchronize();
                 }
             }
         }
-        if self.errors.is_empty() {
-            Ok(program)
+        if self.has_errors {
+            Err(())
         } else {
-            Err(self.errors)
+            Ok(program)
         }
     }
 
@@ -137,7 +137,8 @@ impl<'a> Parser<'a> {
             match self.fun_declaration() {
                 Ok(stmt) => methods.push(stmt),
                 Err(err) => {
-                    self.errors.push(err);
+                    self.error_reporter.report(&err);
+                    self.has_errors = true;
                     self.synchronize();
                 }
             }
@@ -285,7 +286,9 @@ impl<'a> Parser<'a> {
             match self.declaration() {
                 Ok(stmt) => statements.push(stmt),
                 Err(err) => {
-                    self.errors.push(err);
+                    self.error_reporter.report(&err);
+                    self.has_errors = true;
+
                     self.synchronize();
                 }
             }

@@ -1,5 +1,8 @@
 use crate::{
-    compile::{parser::parse_program, resolver::Resolver, scanner::scan_tokens},
+    compile::{
+        error_reporter::ErrorReporter, parser::parse_program, resolver::Resolver,
+        scanner::scan_tokens,
+    },
     runtime::interpreter::Interpreter,
 };
 use std::error::Error;
@@ -13,6 +16,10 @@ pub enum ErrorKind {
     Runtime,
 }
 
+struct BaseErrorReporter;
+
+impl ErrorReporter for BaseErrorReporter {}
+
 impl Lox {
     pub fn new() -> Lox {
         Lox {
@@ -22,28 +29,20 @@ impl Lox {
 
     pub fn run(&mut self, source: &str) -> Result<(), ErrorKind> {
         let tokens = scan_tokens(source);
-        // println!("{:#?}", tokens);
-        match parse_program(tokens) {
-            Ok(mut program) => {
-                //println!("{:#?}", program);
-                let mut resolver = Resolver::new();
-                if let Err(error) = resolver.resolve_program(&mut program) {
-                    self.report(&error);
-                    return Err(ErrorKind::Input);
-                }
-                if let Err(error) = self.interpreter.exec(&program) {
-                    self.report(&error);
-                    Err(ErrorKind::Runtime)
-                } else {
-                    Ok(())
-                }
-            }
-            Err(errors) => {
-                for error in &errors {
-                    self.report(error);
-                }
-                Err(ErrorKind::Input)
-            }
+        let error_reporter = BaseErrorReporter;
+
+        let mut program = parse_program(tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
+
+        let mut resolver = Resolver::new();
+        if let Err(error) = resolver.resolve_program(&mut program) {
+            self.report(&error);
+            return Err(ErrorKind::Input);
+        }
+        if let Err(error) = self.interpreter.exec(&program) {
+            self.report(&error);
+            Err(ErrorKind::Runtime)
+        } else {
+            Ok(())
         }
     }
 
