@@ -26,6 +26,7 @@ enum ClassType {
 }
 
 pub struct Resolver {
+    // nitpick: For me it's expensive type
     scopes: Vec<HashMap<String, DeclarationState>>,
     current_function_type: FunctionType,
     current_class_type: ClassType,

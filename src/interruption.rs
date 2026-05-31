@@ -80,6 +80,7 @@ impl Display for LoxError {
 
 impl std::error::Error for LoxError {}
 
+// Error is a string, maybe convert to predefined enums?
 pub fn new_runtime_error(message: String, span: Option<&Span>) -> LoxError {
     LoxError::Runtime {
         message,

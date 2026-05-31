@@ -25,6 +25,7 @@ impl LoxObject {
         }
     }
 
+    // Why return result, if no errors?
     pub fn bool(&self) -> Result<LoxObject, LoxError> {
         match self {
             LoxObject::Boolean(b) => Ok(LoxObject::Boolean(*b)),

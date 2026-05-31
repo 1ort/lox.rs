@@ -22,8 +22,19 @@ mod span;
 mod token;
 
 fn main() {
+    // Clap?
     let args: Vec<String> = env::args().collect();
     let mut lox = Lox::new();
+    // Match
+    // ```rust
+    // match args.len() {
+    //     2 => exit(run_file(&mut lox, args[1].clone())),
+    //     1 => exit(run_prompt(&mut lox)),
+    //     _ => {
+    //         println!("Usage: lox [script]");
+    //         process::exit(64);
+    //     }
+    // }
     if args.len() > 2 {
         println!("Usage: lox [script]");
         process::exit(64);

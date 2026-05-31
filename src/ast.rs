@@ -9,6 +9,29 @@ pub struct Program {
 pub enum Statement {
     Expression {
         expression: Box<Expression>,
+        // Span is used in every enum variant
+        // i'd convert to:
+        // ```rust
+        // struct Statement {
+        //     expression: Box<Expression>,
+        //     span: Span,
+        // }
+        // ```
+        // or even:
+        // ```rust
+        // struct Spanned<T> {
+        //     value: T,
+        //     span: Span,
+        // }
+        // ```
+        // 
+        // Or (because it also used in Expression and other types)
+        // Move it inside inner-structs and use some trait to get info.
+        // ```rust
+        // trait HasSpan {
+        //     fn span(&self) -> &Span;
+        // }
+        // ```
         span: Span,
     },
     Print {
@@ -58,6 +81,7 @@ pub enum Statement {
 }
 
 impl Statement {
+    // Convert to trait?
     pub fn span(&self) -> &Span {
         match self {
             Statement::Expression { span, .. } => span,

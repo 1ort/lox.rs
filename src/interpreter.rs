@@ -14,6 +14,7 @@ use crate::span::Span;
 use crate::{globals, span};
 
 pub struct Interpreter {
+    // Do they really need to be separate?
     pub environment: Environment,
     pub globals: Environment,
 }

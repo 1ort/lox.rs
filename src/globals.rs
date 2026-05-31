@@ -9,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// Prefix function names with "fun_" redundant
 fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if !args.is_empty() {
         return Err(new_runtime_error(
@@ -73,6 +74,27 @@ fn debug_env(_args: Vec<LoxObject>, env: &Environment) -> Result<LoxObject, LoxE
 pub fn build_globals() -> Environment {
     let mut globals = Environment::new_global();
 
+    // Repetitive code can be hidden in macro:
+    // ```rust
+    // macro_rules! define_native_function {
+    //     ($name:ident, $callable:ident) => {
+    //         globals.define(
+    //             $name.to_string(),
+    //             LoxObject::NativeFunction(Rc::new(NativeFunction {
+    //                 name: $name.to_string(),
+    //                 callable: $callable,
+    //             })),
+    //         );
+    //     };
+    // }
+    // ```
+    // And use it like this:
+    // ```rust
+    // define_native_function!(clock, fun_clock);
+    // define_native_function!(sleep, fun_sleep);
+    // define_native_function!(concat, fun_concat);
+    // define_native_function!(dbgenv, debug_env);
+    // ```
     globals.define(
         "clock".to_string(),
         LoxObject::NativeFunction(Rc::new(NativeFunction {

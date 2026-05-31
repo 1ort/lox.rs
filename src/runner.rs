@@ -24,6 +24,7 @@ impl Lox {
                 let mut resolver = Resolver::new();
                 if let Err(error) = resolver.resolve_program(&mut program) {
                     self.report(&error);
+                    // Constants extract to const FOO = ..;
                     return 65;
                 }
 
