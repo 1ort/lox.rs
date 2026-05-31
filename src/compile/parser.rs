@@ -11,10 +11,7 @@ use crate::{
 use core::slice::Iter;
 use std::iter::Peekable;
 
-pub fn parse_program(
-    tokens: Vec<Token>,
-    error_reporter: &impl ErrorReporter,
-) -> Result<Program, ()> {
+pub fn parse_program(tokens: &[Token], error_reporter: &impl ErrorReporter) -> Result<Program, ()> {
     let parser = Parser {
         tokens: tokens.iter().peekable(),
         is_inside_loop: false,

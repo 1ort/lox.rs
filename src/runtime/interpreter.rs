@@ -504,7 +504,10 @@ impl Interpreter {
                 .map_err(|err| err.with_span(span.clone())),
             LoxObject::NativeFunction(func) => {
                 let NativeFunction { callable, .. } = func.as_ref();
-                Ok(callable(args, &self.environment).map_err(|err| err.with_span(span.clone()))?)
+                Ok(
+                    callable(&args, &self.environment)
+                        .map_err(|err| err.with_span(span.clone()))?,
+                )
             }
             LoxObject::UserFunction(func) => {
                 let UserFunction {

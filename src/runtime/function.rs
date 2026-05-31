@@ -6,8 +6,7 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct NativeFunction {
-    pub name: String,
-    pub callable: fn(Vec<LoxObject>, &Environment) -> Result<LoxObject, LoxError>,
+    pub callable: fn(&[LoxObject], &Environment) -> Result<LoxObject, LoxError>,
 }
 
 impl std::fmt::Display for NativeFunction {

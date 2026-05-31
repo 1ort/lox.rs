@@ -8,7 +8,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
+fn fun_clock(args: &[LoxObject], _env: &Environment) -> Result<LoxObject, LoxError> {
     if !args.is_empty() {
         return Err(new_runtime_error(
             format!(
@@ -25,7 +25,7 @@ fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxE
         .as_millis() as f64;
     Ok(LoxObject::Number(millis))
 }
-fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
+fn fun_sleep(args: &[LoxObject], _env: &Environment) -> Result<LoxObject, LoxError> {
     if args.len() != 1 {
         return Err(new_runtime_error(
             format!(
@@ -51,7 +51,7 @@ fn fun_sleep(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxE
         )),
     }
 }
-fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
+fn fun_concat(args: &[LoxObject], _env: &Environment) -> Result<LoxObject, LoxError> {
     if args.is_empty() {
         return Err(new_runtime_error(
             "Function 'concat' takes at least 1 arguments, but 0 provided".to_string(),
@@ -65,7 +65,7 @@ fn fun_concat(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, Lox
     Ok(LoxObject::String(res))
 }
 
-fn debug_env(_args: Vec<LoxObject>, env: &Environment) -> Result<LoxObject, LoxError> {
+fn debug_env(_args: &[LoxObject], env: &Environment) -> Result<LoxObject, LoxError> {
     Ok(LoxObject::String(format!("{}", env)))
 }
 
@@ -75,28 +75,24 @@ pub fn build_globals() -> Environment {
     globals.define(
         "clock".to_string(),
         LoxObject::NativeFunction(Rc::new(NativeFunction {
-            name: "clock".to_string(),
             callable: fun_clock,
         })),
     );
     globals.define(
         "sleep".to_string(),
         LoxObject::NativeFunction(Rc::new(NativeFunction {
-            name: "sleep".to_string(),
             callable: fun_sleep,
         })),
     );
     globals.define(
         "concat".to_string(),
         LoxObject::NativeFunction(Rc::new(NativeFunction {
-            name: "concat".to_string(),
             callable: fun_concat,
         })),
     );
     globals.define(
         "dbgenv".to_string(),
         LoxObject::NativeFunction(Rc::new(NativeFunction {
-            name: "dbgenv".to_string(),
             callable: debug_env,
         })),
     );

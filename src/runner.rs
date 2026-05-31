@@ -15,6 +15,9 @@ pub enum ErrorKind {
     Runtime,
 }
 
+struct DefaultReporter;
+impl ErrorReporter for DefaultReporter {}
+
 impl Lox {
     pub fn new() -> Lox {
         Lox {
@@ -23,12 +26,10 @@ impl Lox {
     }
 
     pub fn run(&mut self, source: &str) -> Result<(), ErrorKind> {
-        struct DefaultReporter;
-        impl ErrorReporter for DefaultReporter {}
         let error_reporter = DefaultReporter;
 
         let tokens = scan_tokens(source);
-        let mut program = parse_program(tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
+        let mut program = parse_program(&tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
         resolve_program(&mut program, &error_reporter).map_err(|_| ErrorKind::Input)?;
         if let Err(err) = self.interpreter.exec(&program) {
             error_reporter.report(&err);
