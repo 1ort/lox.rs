@@ -1,17 +1,19 @@
-use std::rc::Rc;
-
 use crate::ast::{
     BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
     Program, Statement, UnaryOperator,
 };
-use crate::class::{Class, Instance};
-use crate::environment::Environment;
-use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{LoxError, new_runtime_error};
-use crate::object::LoxObject;
-
-use crate::span::Span;
-use crate::{globals, span};
+use crate::{
+    interruption::{LoxError, new_runtime_error},
+    runtime::{
+        class::{Class, Instance},
+        environment::Environment,
+        function::{NativeFunction, UserFunction},
+        globals,
+        object::LoxObject,
+    },
+    span::Span,
+};
+use std::rc::Rc;
 
 pub struct Interpreter {
     pub environment: Environment,

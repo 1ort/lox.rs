@@ -1,8 +1,8 @@
-use std::iter::Peekable;
-use std::str::Chars;
-
-use crate::span::Span;
-use crate::token::{Token, TokenType};
+use crate::{
+    compile::token::{Token, TokenType},
+    span::Span,
+};
+use std::{iter::Peekable, str::Chars};
 
 pub fn scan_tokens(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();

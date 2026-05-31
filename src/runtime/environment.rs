@@ -1,13 +1,12 @@
+use crate::{
+    interruption::{LoxError, new_runtime_error},
+    runtime::object::LoxObject,
+};
 use std::{
     cell::RefCell,
     collections::{HashMap, hash_map::Entry},
     fmt,
     rc::Rc,
-};
-
-use crate::{
-    interruption::{LoxError, new_runtime_error},
-    object::LoxObject,
 };
 
 #[derive(Debug, Clone)]

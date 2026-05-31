@@ -6,9 +6,9 @@ use crate::{
         BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
         Program, Statement, UnaryOperator,
     },
+    compile::token::{Token, TokenType},
     interruption::{LoxError, new_syntax_error},
     span::Span,
-    token::{Token, TokenType},
 };
 
 pub fn parse_program(tokens: Vec<Token>) -> Result<Program, Vec<LoxError>> {

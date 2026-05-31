@@ -1,9 +1,11 @@
-use std::fmt;
-use std::rc::Rc;
-
-use crate::class::{Class, Instance};
-use crate::function::{NativeFunction, UserFunction};
-use crate::interruption::{LoxError, new_runtime_error};
+use crate::{
+    interruption::{LoxError, new_runtime_error},
+    runtime::{
+        class::{Class, Instance},
+        function::{NativeFunction, UserFunction},
+    },
+};
+use std::{fmt, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub enum LoxObject {

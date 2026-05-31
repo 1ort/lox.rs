@@ -1,6 +1,6 @@
+use crate::interruption::LoxError;
+use crate::runtime::{function::UserFunction, object::LoxObject};
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
-
-use crate::{function::UserFunction, interruption::LoxError, object::LoxObject};
 
 #[derive(Debug)]
 pub struct Class {

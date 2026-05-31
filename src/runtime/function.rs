@@ -1,7 +1,9 @@
+use crate::{
+    ast::Statement, interruption::LoxError, runtime::environment::Environment,
+    runtime::object::LoxObject,
+};
 use core::fmt;
 use std::rc::Rc;
-
-use crate::{ast::Statement, environment::Environment, interruption::LoxError, object::LoxObject};
 
 #[derive(Debug)]
 pub struct NativeFunction {

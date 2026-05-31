@@ -1,11 +1,16 @@
-use std::error::Error;
-
 use crate::{
-    interpreter::Interpreter, parser::parse_program, resolver::Resolver, scanner::scan_tokens,
+    compile::{parser::parse_program, resolver::Resolver, scanner::scan_tokens},
+    runtime::interpreter::Interpreter,
 };
+use std::error::Error;
 
 pub struct Lox {
     interpreter: Interpreter,
+}
+
+pub enum ErrorKind {
+    Input,
+    Runtime,
 }
 
 impl Lox {
@@ -15,7 +20,7 @@ impl Lox {
         }
     }
 
-    pub fn run(&mut self, source: &str) -> i32 {
+    pub fn run(&mut self, source: &str) -> Result<(), ErrorKind> {
         let tokens = scan_tokens(source);
         // println!("{:#?}", tokens);
         match parse_program(tokens) {
@@ -24,21 +29,20 @@ impl Lox {
                 let mut resolver = Resolver::new();
                 if let Err(error) = resolver.resolve_program(&mut program) {
                     self.report(&error);
-                    return 65;
+                    return Err(ErrorKind::Input);
                 }
-
                 if let Err(error) = self.interpreter.exec(&program) {
                     self.report(&error);
-                    70
+                    Err(ErrorKind::Runtime)
                 } else {
-                    0
+                    Ok(())
                 }
             }
             Err(errors) => {
                 for error in &errors {
                     self.report(error);
                 }
-                65
+                Err(ErrorKind::Input)
             }
         }
     }

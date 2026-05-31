@@ -1,45 +1,30 @@
-use runner::Lox;
-use std::env;
-use std::fs;
-use std::io;
-use std::io::Write;
-use std::process;
-use std::process::exit;
+use runner::{ErrorKind, Lox};
+use std::{
+    env,
+    ffi::OsStr,
+    fs,
+    io::{self, Write},
+    process::ExitCode,
+};
 
 mod ast;
-mod class;
-mod environment;
-mod function;
-mod globals;
-mod interpreter;
+mod compile;
 mod interruption;
-mod object;
-mod parser;
-mod resolver;
 mod runner;
-mod scanner;
+mod runtime;
 mod span;
-mod token;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut lox = Lox::new();
-    if args.len() > 2 {
-        println!("Usage: lox [script]");
-        process::exit(64);
-    } else if args.len() == 2 {
-        exit(run_file(&mut lox, args[1].clone()))
-    } else {
-        exit(run_prompt(&mut lox))
+fn main() -> ExitCode {
+    let args: Vec<_> = env::args_os().skip(1).collect();
+    match &args[..] {
+        [] => repl(),
+        [path] => run_file(path),
+        _ => incorrect_usage(),
     }
 }
 
-fn run_file(lox: &mut Lox, filename: String) -> i32 {
-    let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
-    lox.run(&contents)
-}
-
-fn run_prompt(lox: &mut Lox) -> i32 {
+fn repl() -> ExitCode {
+    let mut lox = Lox::new();
     loop {
         let mut line = String::new();
         print!("> ");
@@ -50,5 +35,30 @@ fn run_prompt(lox: &mut Lox) -> i32 {
         }
         lox.run(line.trim_end());
     }
-    0
+    ExitCode::from(0)
+}
+
+fn run_file(filename: &OsStr) -> ExitCode {
+    let contents = fs::read_to_string(filename);
+    if let Ok(contents) = contents {
+        match Lox::new().run(&contents) {
+            Ok(_) => ExitCode::from(0),
+            Err(error_kind) => exit_code_from_error_kind(error_kind),
+        }
+    } else {
+        eprintln!("Should have been able to read the file");
+        ExitCode::from(64)
+    }
+}
+
+fn incorrect_usage() -> ExitCode {
+    println!("Usage: lox [script]");
+    ExitCode::from(64)
+}
+
+fn exit_code_from_error_kind(error_kind: ErrorKind) -> ExitCode {
+    match error_kind {
+        ErrorKind::Input => ExitCode::from(65),
+        ErrorKind::Runtime => ExitCode::from(70),
+    }
 }

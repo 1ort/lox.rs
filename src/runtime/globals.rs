@@ -1,13 +1,12 @@
-use crate::environment::Environment;
-use crate::function::NativeFunction;
-use crate::interruption::LoxError;
-use crate::interruption::new_runtime_error;
-use crate::object::LoxObject;
-
-use std::rc::Rc;
-use std::thread;
-use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::{
+    interruption::{LoxError, new_runtime_error},
+    runtime::{environment::Environment, function::NativeFunction, object::LoxObject},
+};
+use std::{
+    rc::Rc,
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 fn fun_clock(args: Vec<LoxObject>, _env: &Environment) -> Result<LoxObject, LoxError> {
     if !args.is_empty() {

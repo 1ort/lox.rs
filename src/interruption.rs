@@ -1,8 +1,8 @@
-use std::fmt::{self, write};
-use std::fmt::{Display, Formatter};
-
-use crate::span::Span;
-use crate::token::{Token, TokenType};
+use crate::{
+    compile::token::{Token, TokenType},
+    span::Span,
+};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub enum LoxError {
