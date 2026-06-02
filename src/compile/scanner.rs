@@ -8,8 +8,6 @@ pub fn scan_tokens(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut lexer = Lexer {
         source: source.chars().peekable(),
-        line: 1,
-        col: 1,
         pos: 0,
     };
 
@@ -30,19 +28,12 @@ type Source<'a> = Peekable<Chars<'a>>;
 
 struct Lexer<'a> {
     source: Source<'a>,
-    line: usize,
-    col: usize,
     pos: usize,
 }
 
 impl<'a> Lexer<'a> {
     fn span(&self, len: usize) -> Span {
-        Span {
-            line: self.line,
-            col: self.col,
-            pos: self.pos,
-            len,
-        }
+        Span { pos: self.pos, len }
     }
 
     fn lex(self: &mut Lexer<'a>) -> Token {
@@ -214,12 +205,6 @@ impl<'a> Lexer<'a> {
             if !till(c) {
                 break;
             }
-            if c == &'\n' {
-                self.line += 1;
-                self.col = 1;
-                self.pos += 1;
-            }
-
             buff.push(*c);
             self.next();
         }
@@ -235,11 +220,6 @@ impl<'a> Lexer<'a> {
             if !till(c) {
                 break;
             }
-            if c == &'\n' {
-                self.line += 1;
-                self.col = 1;
-                self.pos += 1;
-            }
             self.next();
         }
     }
@@ -247,7 +227,6 @@ impl<'a> Lexer<'a> {
     fn next(&mut self) -> Option<char> {
         if let Some(ch) = self.source.next() {
             self.pos += 1;
-            self.col += 1;
             Some(ch)
         } else {
             None

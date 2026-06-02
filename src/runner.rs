@@ -3,6 +3,7 @@ use crate::{
         error_reporter::ErrorReporter, parser::parse_program, resolver::resolve_program,
         scanner::scan_tokens,
     },
+    error_reporter,
     runtime::interpreter::Interpreter,
 };
 
@@ -15,9 +16,6 @@ pub enum ErrorKind {
     Runtime,
 }
 
-struct DefaultReporter;
-impl ErrorReporter for DefaultReporter {}
-
 impl Lox {
     pub fn new() -> Lox {
         Lox {
@@ -26,7 +24,7 @@ impl Lox {
     }
 
     pub fn run(&mut self, source: &str) -> Result<(), ErrorKind> {
-        let error_reporter = DefaultReporter;
+        let error_reporter = error_reporter::ErrorReporter::new(source);
 
         let tokens = scan_tokens(source);
         let mut program = parse_program(&tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
