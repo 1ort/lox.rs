@@ -1,4 +1,4 @@
-use crate::error::LoxError;
+use crate::error::error::LoxError;
 
 pub trait ErrorReporter {
     fn report(&self, err: &LoxError) {

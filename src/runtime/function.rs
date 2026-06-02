@@ -1,5 +1,6 @@
 use crate::{
-    ast::Statement, error::LoxError, runtime::environment::Environment, runtime::object::LoxObject,
+    ast::Statement, error::error::LoxError, runtime::environment::Environment,
+    runtime::object::LoxObject,
 };
 use core::fmt;
 use std::rc::Rc;

@@ -3,9 +3,11 @@ use crate::{
         BinaryOperator, Expression, FunctionStatement, Identifier, LiteralValue, LogicalOperator,
         Program, Statement, UnaryOperator,
     },
-    compile::error_reporter::ErrorReporter,
     compile::token::{Token, TokenType},
-    error::{LoxError, new_syntax_error},
+    error::{
+        error::{LoxError, new_syntax_error},
+        reporter::ErrorReporter,
+    },
     span::Span,
 };
 use core::slice::Iter;

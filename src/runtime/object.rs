@@ -1,5 +1,5 @@
 use crate::{
-    error::{LoxError, new_runtime_error},
+    error::error::{LoxError, new_runtime_error},
     runtime::{
         class::{Class, Instance},
         function::{NativeFunction, UserFunction},

@@ -10,7 +10,6 @@ use std::{
 mod ast;
 mod compile;
 mod error;
-mod error_reporter;
 mod runner;
 mod runtime;
 mod span;

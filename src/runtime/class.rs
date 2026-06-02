@@ -1,4 +1,4 @@
-use crate::error::LoxError;
+use crate::error::error::LoxError;
 use crate::runtime::{function::UserFunction, object::LoxObject};
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 

@@ -1,7 +1,4 @@
-use crate::{
-    compile::token::{Token, TokenType},
-    span::Span,
-};
+use crate::{compile::token::Token, span::Span};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]

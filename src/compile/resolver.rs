@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{Expression, FunctionStatement, Identifier, Program, Statement},
-    compile::error_reporter::ErrorReporter,
-    error::{LoxError, new_resolver_error},
+    error::{
+        error::{LoxError, new_resolver_error},
+        reporter::ErrorReporter,
+    },
 };
 
 pub fn resolve_program(

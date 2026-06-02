@@ -1,7 +1,5 @@
-use crate::{
-    compile::token::{Token, TokenType},
-    error::LoxError,
-};
+use crate::compile::token::{Token, TokenType};
+use crate::error::error::LoxError;
 
 pub struct ErrorReporter<'a> {
     source: &'a str,
@@ -36,7 +34,7 @@ impl<'a> ErrorReporter<'a> {
     }
 }
 
-impl<'a> crate::compile::error_reporter::ErrorReporter for ErrorReporter<'a> {
+impl<'a> crate::error::reporter::ErrorReporter for ErrorReporter<'a> {
     fn report(&self, err: &LoxError) {
         match err {
             LoxError::Runtime { message, span } => {

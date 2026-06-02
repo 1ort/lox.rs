@@ -1,9 +1,6 @@
 use crate::{
-    compile::{
-        error_reporter::ErrorReporter, parser::parse_program, resolver::resolve_program,
-        scanner::scan_tokens,
-    },
-    error_reporter,
+    compile::{parser::parse_program, resolver::resolve_program, scanner::scan_tokens},
+    error::{default_reporter, reporter::ErrorReporter},
     runtime::interpreter::Interpreter,
 };
 
@@ -24,7 +21,7 @@ impl Lox {
     }
 
     pub fn run(&mut self, source: &str) -> Result<(), ErrorKind> {
-        let error_reporter = error_reporter::ErrorReporter::new(source);
+        let error_reporter = default_reporter::ErrorReporter::new(source);
 
         let tokens = scan_tokens(source);
         let mut program = parse_program(&tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
