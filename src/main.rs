@@ -33,7 +33,7 @@ fn repl() -> ExitCode {
         if line.trim_end().is_empty() {
             break;
         }
-        let _ = lox.run(line.trim_end());
+        let _ = lox.run(line.trim_end(), "repl");
     }
     ExitCode::from(0)
 }
@@ -41,7 +41,7 @@ fn repl() -> ExitCode {
 fn run_file(filename: &OsStr) -> ExitCode {
     let contents = fs::read_to_string(filename);
     if let Ok(contents) = contents {
-        match Lox::new().run(&contents) {
+        match Lox::new().run(&contents, filename.to_str().unwrap()) {
             Ok(_) => ExitCode::from(0),
             Err(error_kind) => exit_code_from_error_kind(error_kind),
         }

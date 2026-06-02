@@ -12,3 +12,21 @@ impl Span {
         }
     }
 }
+
+impl From<Span> for std::ops::Range<usize> {
+    fn from(value: Span) -> Self {
+        Self {
+            start: value.pos,
+            end: value.pos + value.len,
+        }
+    }
+}
+
+impl Default for Span {
+    fn default() -> Self {
+        Self {
+            pos: Default::default(),
+            len: Default::default(),
+        }
+    }
+}

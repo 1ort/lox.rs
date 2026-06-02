@@ -1,6 +1,6 @@
 use crate::{
     compile::{parser::parse_program, resolver::resolve_program, scanner::scan_tokens},
-    error::{default_reporter, reporter::ErrorReporter},
+    error::{ariadne::AriadneReporter, default_reporter, reporter::ErrorReporter},
     runtime::interpreter::Interpreter,
 };
 
@@ -20,8 +20,8 @@ impl Lox {
         }
     }
 
-    pub fn run(&mut self, source: &str) -> Result<(), ErrorKind> {
-        let error_reporter = default_reporter::ErrorReporter::new(source);
+    pub fn run(&mut self, source: &str, source_name: &str) -> Result<(), ErrorKind> {
+        let error_reporter = AriadneReporter::new(source, source_name);
 
         let tokens = scan_tokens(source);
         let mut program = parse_program(&tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
