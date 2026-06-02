@@ -1,4 +1,8 @@
-use runner::{ErrorKind, Lox};
+use crate::{
+    compile::{parser::parse_program, resolver::resolve_program, scanner::scan_tokens},
+    error::{ariadne::AriadneReporter, reporter::ErrorReporter},
+    runtime::interpreter::Interpreter,
+};
 use std::{
     env,
     ffi::OsStr,
@@ -10,9 +14,13 @@ use std::{
 mod ast;
 mod compile;
 mod error;
-mod runner;
 mod runtime;
 mod span;
+
+enum ErrorKind {
+    Input,
+    Runtime,
+}
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -33,7 +41,7 @@ fn repl() -> ExitCode {
         if line.trim_end().is_empty() {
             break;
         }
-        let _ = lox.run(line.trim_end(), "repl");
+        let _ = run(&mut lox, line.trim_end(), "repl");
     }
     ExitCode::from(0)
 }
@@ -41,7 +49,8 @@ fn repl() -> ExitCode {
 fn run_file(filename: &OsStr) -> ExitCode {
     let contents = fs::read_to_string(filename);
     if let Ok(contents) = contents {
-        match Lox::new().run(&contents, filename.to_str().unwrap()) {
+        let mut lox = Lox::new();
+        match run(&mut lox, &contents, filename.to_str().unwrap()) {
             Ok(_) => ExitCode::from(0),
             Err(error_kind) => exit_code_from_error_kind(error_kind),
         }
@@ -60,5 +69,32 @@ fn exit_code_from_error_kind(error_kind: ErrorKind) -> ExitCode {
     match error_kind {
         ErrorKind::Input => ExitCode::from(65),
         ErrorKind::Runtime => ExitCode::from(70),
+    }
+}
+
+struct Lox {
+    interpreter: Interpreter,
+}
+
+fn run(lox: &mut Lox, source: &str, source_name: &str) -> Result<(), ErrorKind> {
+    let error_reporter = AriadneReporter::new(source, source_name);
+
+    let tokens = scan_tokens(source);
+    let mut program = parse_program(&tokens, &error_reporter).map_err(|_| ErrorKind::Input)?;
+    resolve_program(&mut program, &error_reporter).map_err(|_| ErrorKind::Input)?;
+
+    if let Err(err) = lox.interpreter.exec(&program) {
+        error_reporter.report(&err);
+        Err(ErrorKind::Runtime)
+    } else {
+        Ok(())
+    }
+}
+
+impl Lox {
+    pub fn new() -> Lox {
+        Lox {
+            interpreter: Interpreter::new(),
+        }
     }
 }

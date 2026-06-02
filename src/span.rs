@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Span {
     pub pos: usize,
     pub len: usize,
@@ -18,15 +18,6 @@ impl From<Span> for std::ops::Range<usize> {
         Self {
             start: value.pos,
             end: value.pos + value.len,
-        }
-    }
-}
-
-impl Default for Span {
-    fn default() -> Self {
-        Self {
-            pos: Default::default(),
-            len: Default::default(),
         }
     }
 }

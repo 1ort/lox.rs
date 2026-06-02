@@ -4,7 +4,6 @@ use crate::span::Span;
 pub struct Program {
     pub statements: Vec<Statement>,
 }
-
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expression {
